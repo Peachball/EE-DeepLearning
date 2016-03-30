@@ -72,11 +72,11 @@ def readcv(length=10000):
 
 
 class Layer:
-    def __init__(self, in_size, out_size, no_compile=True, layer_type='sigmoid', in_var=None,
+    def __init__(self, in_size, out_size, layer_type='sigmoid', in_var=None,
             init_size=0.1):
         self.in_size = in_size
         self.out_size = out_size
-        if not layer_type in ['sigmoid', 'tanh', 'lstm', 'rnn']:
+        if not layer_type in ['sigmoid', 'tanh', 'lstm', 'rnn', 'linear']:
             raise Exception('Layer type is invalid: ' + str(layer_type))
         
         if in_var==None:
@@ -84,7 +84,7 @@ class Layer:
         else:
             x = in_var
         
-        if layer_type in ['sigmoid', 'tanh']:
+        if layer_type in ['sigmoid', 'tanh', 'linear']:
             self.w = theano.shared((np.random.rand(in_size, out_size) - 0.5) *
                     init_size).astype(theano.config.floatX)
             self.b = theano.shared((np.random.rand(out_size) - 0.5) *
@@ -93,18 +93,20 @@ class Layer:
                 self.out = T.nnet.sigmoid( x * self.w + self.b )
             if layer_type == 'tanh':
                 self.out = T.tanh( x * self.w + self.b )
-            
+            if layer_type == 'linear':
+                self.out = x * self.w + self.b
             self.params = [self.w, self.b]
 
+def generateMomentumUpdates(params, momentum, alpha):
+    mparams = [theano.shared(np.zeros(g.eval().shape)).astype(config.floatX) for g in grad]
+    gradUpdates = OrderedDict((p, p - g) for p, g in zip(self.params, self.mparams))
 
-    def predict(self, x):
-        pass
+    gradUpdates.update(OrderedDict((m, self.momentum * m + self.alpha * g) for m, g in
+        zip(mparams, grad)))
+    return (gradUpdates, mparams)
 
-    def getParams(self):
-        pass
+def generateRpropUpdates(params):
 
-    def getOutput(self):
-        pass
 
 class AutoEncoder:
     def __init__(self, *dim, **kwargs):
