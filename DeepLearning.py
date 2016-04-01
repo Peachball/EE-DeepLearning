@@ -1,11 +1,17 @@
 from __future__ import print_function
+from collections import OrderedDict
 import theano.tensor as T
 import theano
+from theano import config
 import numpy as np
+import struct
+import matplotlib.pyplot as plt
+
+theano.config.floatX = 'float64'
 
 def readMNISTData(length=10000):
-    images = open('../train-images.idx3-ubyte', 'rb')
-    labels = open('../train-labels.idx1-ubyte', 'rb')
+    images = open('train-images-idx3-ubyte', 'rb')
+    labels = open('train-labels-idx1-ubyte', 'rb')
     images.read(8)
     labels.read(8)
     def readInt(isn=True):
@@ -37,8 +43,8 @@ def readMNISTData(length=10000):
     return (np.array(imgs), np.array(lbls))
     
 def readcv(length=10000):
-    images = open('../t10k-images.idx3-ubyte', 'rb')
-    labels = open('../t10k-labels.idx1-ubyte', 'rb')
+    images = open('t10k-images-idx3-ubyte', 'rb')
+    labels = open('t10k-labels-idx1-ubyte', 'rb')
     images.read(8)
     labels.read(8)
     def readInt(isn=True):
@@ -90,26 +96,130 @@ class Layer:
             self.b = theano.shared((np.random.rand(out_size) - 0.5) *
                     init_size).astype(theano.config.floatX)
             if layer_type == 'sigmoid':
-                self.out = T.nnet.sigmoid( x * self.w + self.b )
+                self.out = T.nnet.sigmoid( T.dot(x, self.w) + self.b )
             if layer_type == 'tanh':
-                self.out = T.tanh( x * self.w + self.b )
+                self.out = T.tanh( T.dot(x, self.w) + self.b )
             if layer_type == 'linear':
                 self.out = x * self.w + self.b
             self.params = [self.w, self.b]
 
-def generateMomentumUpdates(params, momentum, alpha):
-    mparams = [theano.shared(np.zeros(g.eval().shape)).astype(config.floatX) for g in grad]
-    gradUpdates = OrderedDict((p, p - g) for p, g in zip(self.params, self.mparams))
+def generateMomentumUpdates(params, momentum, alpha, error):
+    grad = []
+    for p in params:
+        grad.append(T.grad(error, p))
+    mparams = [theano.shared(np.zeros(p.get_value().shape)).astype(theano.config.floatX) for p in params]
+    gradUpdates = OrderedDict((p, p - g) for p, g in zip(params,mparams))
 
-    gradUpdates.update(OrderedDict((m, self.momentum * m + self.alpha * g) for m, g in
+    gradUpdates.update(OrderedDict((m, momentum * m + alpha * g) for m, g in
         zip(mparams, grad)))
-    return (gradUpdates, mparams)
+    return ([gradUpdates, mparams], gradUpdates)
 
-def generateRpropUpdates(params):
+def generateRpropUpdates(params, error, init_size=1):
+    prevw = []
+    deltaw = []
+    updates = []
+    gradients = []
+    #initalize stuff
+    for p in params:
+        prevw.append(theano.shared(np.zeros(p.get_value().shape)).astype(config.floatX))
+        deltaw.append(theano.shared(init_size *  np.ones(p.get_value().shape)).astype(config.floatX))
 
+    for p, dw, pw in zip(params, deltaw, prevw):
+        gradients.append(T.grad(error, p))
+        #Array describing which values are when gradients are both positive or both negative
+        simW = T.neq((T.eq((pw > 0), (gradients[-1] > 0))), (T.eq((pw < 0), (gradients[-1] <
+            0))))
+
+        #Array describing which values are when gradients are in opposite directions
+        diffW = ((pw > 0) ^ (gradients[-1] > 0)) * (T.neq(pw, 0) * T.neq(gradients[-1], 0))
+        updates.append((p, p - (T.sgn(gradients[-1]) * dw * (T.eq(diffW, 0)))))
+        updates.append((dw, T.switch(diffW, dw *
+            0.5, T.switch(simW, dw * 1.2, dw))))
+        updates.append((pw, (T.sgn(gradients[-1]) * dw * (T.eq(diffW, 0)))))
+    
+    storage = prevw + deltaw
+
+    return (storage, updates)
 
 class AutoEncoder:
     def __init__(self, *dim, **kwargs):
         momentum = kwargs.get('momentum', 0)
         alpha = kwargs.get('alpha', 0.01)
         rprop = kwargs.get('rprop', False)
+        init_size = kwargs.get('init_size', 1)
+        verbose = kwargs.get('verbose', False)
+        layers = []
+
+        self.x = kwargs.get('in_var', T.matrix('Generalized Input'))
+        layers.append(Layer(dim[0], dim[1], in_var=self.x, init_size=init_size))
+        for i in range(1, len(dim) - 1):
+            layers.append(Layer(dim[i], dim[i+1], in_var=layers[-1].out, init_size=init_size))
+
+        self.out = layers[-1].out
+        decoder = []
+
+        decoder.append(Layer(dim[-1], dim[-2], in_var=self.out, init_size=init_size))
+        for i in range(2, len(dim)):
+            decoder.append(Layer(dim[-i], dim[-i-1], in_var=decoder[-1].out, init_size=init_size))
+
+        self.reconstructed = decoder[-1].out
+
+        self.encode = layers
+        self.decode = decoder
+
+        if verbose: print(len(layers), len(decoder))
+        self.layers = self.encode + self.decode
+
+        self.params =[]
+
+        for l in layers:
+            self.params = self.params + l.params
+
+        print('Finished initialization')
+
+def matplotlibQuitter(event):
+    if event.key == 'q':
+        quit()
+
+def AETester():
+    images, labels = readMNISTData(1)
+    xcv, ycv = readcv(1)
+    ae = AutoEncoder(784, 1)
+
+#    images = images / images.max()
+
+    genImage = theano.function([ae.x], ae.reconstructed, mode='DebugMode')
+
+    y = T.matrix('correct output')
+    mse = T.mean(T.sqr(y - ae.reconstructed))
+
+    (momentumStorage, updates) = generateMomentumUpdates(ae.params, 0.5, 3, mse)
+    (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=10)
+
+    learn = theano.function([ae.x, y], mse, updates=updates)
+
+    train_error = []
+    iterations = 10000
+    for i in range(iterations):
+        e = learn(images, images)
+        train_error.append(e)
+        print(e)
+
+    plt.plot(np.arange(0, iterations), train_error)
+    plt.ylim(0, plt.ylim()[1])
+    plt.draw()
+    plt.pause(1)
+    input('is it good?')
+    plt.close()
+
+    for i in range(len(images)):
+        generated_image = genImage(images[i].reshape(1, 784))
+        plt.imshow(generated_image.reshape(28, 28), cmap='Greys')
+        plt.figure()
+        plt.imshow(images[i].reshape(28, 28), cmap='Greys')
+        plt.draw()
+        plt.pause(1)
+        plt.close()
+
+if __name__ == '__main__':
+    AETester()
