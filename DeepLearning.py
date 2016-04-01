@@ -125,7 +125,11 @@ def generateRpropUpdates(params, error, init_size=1):
         deltaw.append(theano.shared(init_size *  np.ones(p.get_value().shape)).astype(config.floatX))
 
     for p, dw, pw in zip(params, deltaw, prevw):
-        gradients.append(T.grad(error, p))
+        try:
+            gradients.append(T.grad(error, p))
+        except Exception:
+            print('Unused input')
+            continue
         #Array describing which values are when gradients are both positive or both negative
         simW = T.neq((T.eq((pw > 0), (gradients[-1] > 0))), (T.eq((pw < 0), (gradients[-1] <
             0))))
@@ -172,8 +176,9 @@ class AutoEncoder:
 
         self.params =[]
 
-        for l in layers:
+        for l in self.layers:
             self.params = self.params + l.params
+
 
         print('Finished initialization')
 
@@ -182,44 +187,41 @@ def matplotlibQuitter(event):
         quit()
 
 def AETester():
-    images, labels = readMNISTData(1)
+    images, labels = readMNISTData(10000)
     xcv, ycv = readcv(1)
-    ae = AutoEncoder(784, 1)
+    ae = AutoEncoder(784, 600, 500, init_size=10)
 
 #    images = images / images.max()
 
     genImage = theano.function([ae.x], ae.reconstructed, mode='DebugMode')
 
     y = T.matrix('correct output')
+    yl = T.matrix('Correct labels')
     mse = T.mean(T.sqr(y - ae.reconstructed))
+    
+    crossEntrop = -T.mean(yl * T.log(ae.out) + (1 - yl) * T.log(1 - ae.out))
 
-    (momentumStorage, updates) = generateMomentumUpdates(ae.params, 0.5, 3, mse)
-    (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=10)
+    (momentumStorage, updates) = generateMomentumUpdates(ae.params, 0.9, 10, mse)
+    (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=0.01)
 
-    learn = theano.function([ae.x, y], mse, updates=updates)
-
+    learn = theano.function([ae.x, y], mse, updates=rpropupdates)
     train_error = []
-    iterations = 10000
+    iterations = 1000
     for i in range(iterations):
         e = learn(images, images)
         train_error.append(e)
         print(e)
 
     plt.plot(np.arange(0, iterations), train_error)
-    plt.ylim(0, plt.ylim()[1])
-    plt.draw()
-    plt.pause(1)
-    input('is it good?')
-    plt.close()
+#    plt.ylim(0, plt.ylim()[1])
+    plt.show()
 
     for i in range(len(images)):
         generated_image = genImage(images[i].reshape(1, 784))
         plt.imshow(generated_image.reshape(28, 28), cmap='Greys')
         plt.figure()
         plt.imshow(images[i].reshape(28, 28), cmap='Greys')
-        plt.draw()
-        plt.pause(1)
-        plt.close()
+        plt.show()
 
 if __name__ == '__main__':
     AETester()
