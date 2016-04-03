@@ -1,4 +1,6 @@
 from __future__ import print_function
+import sys
+import pickle
 from collections import OrderedDict
 import theano.tensor as T
 import theano
@@ -6,6 +8,8 @@ from theano import config
 import numpy as np
 import struct
 import matplotlib.pyplot as plt
+
+sys.setrecursionlimit(10000)
 
 theano.config.floatX = 'float64'
 
@@ -38,8 +42,8 @@ def readMNISTData(length=10000):
     for i in range(length):
         imgs.append(readImage())
         lbls.append(readLabel())
-        print('\r Read {}/{}'.format(i+1, length), end="")
-    print('Done reading')
+        print('\rRead {}/{}'.format(i+1, length), end="")
+    print('\nDone reading')
     return (np.array(imgs), np.array(lbls))
     
 def readcv(length=10000):
@@ -71,9 +75,9 @@ def readcv(length=10000):
     for i in range(length):
         imgs.append(readImage())
         lbls.append(readLabel())
-        print('\r Read {}/{}'.format(i+1, length), end="")
+        print('\rRead {}/{}'.format(i+1, length), end="")
         
-    print ('Done Reading')
+    print ('\nDone Reading')
     return (np.array(imgs), np.array(lbls))
 
 
@@ -87,6 +91,7 @@ class Layer:
         
         if in_var==None:
             x = T.matrix('Input')
+            print('hello')
         else:
             x = in_var
         
@@ -100,8 +105,16 @@ class Layer:
             if layer_type == 'tanh':
                 self.out = T.tanh( T.dot(x, self.w) + self.b )
             if layer_type == 'linear':
-                self.out = x * self.w + self.b
+                self.out = T.dot(x, self.w) + self.b
             self.params = [self.w, self.b]
+
+def generateVanillaUpdates(params, alpha, error):
+    grad = []
+    for p in params:
+        grad.append(T.grad(error, p))
+    updates = [(p, p - g) for p, g in zip(params, grad)]
+
+    return updates
 
 def generateMomentumUpdates(params, momentum, alpha, error):
     grad = []
@@ -152,6 +165,7 @@ class AutoEncoder:
         rprop = kwargs.get('rprop', False)
         init_size = kwargs.get('init_size', 1)
         verbose = kwargs.get('verbose', False)
+        in_type = kwargs.get('in_type', 'linear')
         layers = []
 
         self.x = kwargs.get('in_var', T.matrix('Generalized Input'))
@@ -162,9 +176,18 @@ class AutoEncoder:
         self.out = layers[-1].out
         decoder = []
 
-        decoder.append(Layer(dim[-1], dim[-2], in_var=self.out, init_size=init_size))
+        if len(dim) > 2:
+            layer_type = 'sigmoid'
+        else:
+            layer_type = in_type
+        decoder.append(Layer(dim[-1], dim[-2], in_var=self.out, init_size=init_size,
+            layer_type=layer_type))
         for i in range(2, len(dim)):
-            decoder.append(Layer(dim[-i], dim[-i-1], in_var=decoder[-1].out, init_size=init_size))
+            if i == len(dim) - 1:
+                layer_type = in_type
+            decoder.append(Layer(dim[-i], dim[-i-1], in_var=decoder[-1].out,
+                init_size=init_size, layer_type=layer_type))
+
 
         self.reconstructed = decoder[-1].out
 
@@ -182,18 +205,49 @@ class AutoEncoder:
 
         print('Finished initialization')
 
-def matplotlibQuitter(event):
-    if event.key == 'q':
-        quit()
+    def learn(self,x, y, mode='vanilla'):
+        pass
+
+class FFClassifier:
+    def __init__(self, *dim, **kwargs):
+        
+        x = T.matrix('input')
+        self.x = x
+        init_size = kwargs.get('init_size', 0.1)
+        
+        layers = []
+        layers.append(Layer(dim[0], dim[1], in_var=x, init_size=init_size))
+        for i in range(1, len(dim) - 1):
+            layers.append(Layer(dim[i], dim[i+1], in_var=layers[-1].out, init_size=init_size))
+
+        self.out = layers[-1].out
+        self.layers = layers
+
+        self.params = []
+        for l in layers:
+            self.params = self.params + l.params
+
+def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
+    train_error = []
+    np.set_printoptions(precision=10)
+    if batchSize <= 0:
+        batchSize = x.shape[0]
+    for j in range(epochs):
+        for i in range(0, x.shape[0], batchSize):
+            error = updateFunction(x[i:(i+batchSize)], y[i:(i+batchSize)])
+            train_error.append(error)
+            if verbose: print('{0:14} Epoch: {1:4}'.format(np.round(error, 10), round((j +
+                (i/x.shape[0])), 2)))
+    return train_error
 
 def AETester():
     images, labels = readMNISTData(10000)
     xcv, ycv = readcv(1)
-    ae = AutoEncoder(784, 600, 500, init_size=10)
+    ae = AutoEncoder(784, 600, init_size=1)
 
 #    images = images / images.max()
 
-    genImage = theano.function([ae.x], ae.reconstructed, mode='DebugMode')
+    genImage = theano.function([ae.x], ae.reconstructed)
 
     y = T.matrix('correct output')
     yl = T.matrix('Correct labels')
@@ -202,26 +256,43 @@ def AETester():
     crossEntrop = -T.mean(yl * T.log(ae.out) + (1 - yl) * T.log(1 - ae.out))
 
     (momentumStorage, updates) = generateMomentumUpdates(ae.params, 0.9, 10, mse)
-    (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=0.01)
+    (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=1)
+    (dupdates) = generateVanillaUpdates(ae.params, 0.001, mse)
 
     learn = theano.function([ae.x, y], mse, updates=rpropupdates)
-    train_error = []
-    iterations = 1000
-    for i in range(iterations):
-        e = learn(images, images)
-        train_error.append(e)
-        print(e)
+    train_error = miniBatchLearning(images, images, -1, learn, verbose=True, epochs=100)
 
-    plt.plot(np.arange(0, iterations), train_error)
-#    plt.ylim(0, plt.ylim()[1])
+    plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 
     for i in range(len(images)):
         generated_image = genImage(images[i].reshape(1, 784))
+        print("Min: {0:10} Max: {1:10}".format(generated_image.min(), generated_image.max()))
         plt.imshow(generated_image.reshape(28, 28), cmap='Greys')
         plt.figure()
         plt.imshow(images[i].reshape(28, 28), cmap='Greys')
         plt.show()
+
+def NNTester():
+    images, labels = readMNISTData(60000)
+    xcv, ycv = readcv(10000)
+
+    y = T.matrix('Correct Labels')
+    nn = FFClassifier(784, 1000, 10)
+    error = -T.mean(y * T.log(nn.out) + (1-y) * T.log(1- nn.out))
+
+    dupdates = generateVanillaUpdates(nn.params, 0.00001, error)
+
+    learn = theano.function([nn.x, y], error, updates=dupdates)
+    predict = theano.function([nn.x], nn.out)
+
+    train_error = miniBatchLearning(images, labels, 500, learn, verbose=True, epochs=50)
+    
+    plt.plot(np.arange(len(train_error)), train_error)
+    plt.show()
+
+    accuracy = np.sum(np.equal(np.argmax(predict(xcv), axis=1), np.argmax(ycv, axis=1)))
+    print(accuracy / ycv.shape[0])
 
 if __name__ == '__main__':
     AETester()

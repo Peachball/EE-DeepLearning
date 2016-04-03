@@ -1,2 +1,6 @@
 musicDataSet/*
 *.swp
+__pycache__/
+*.aux
+*.dvi
+*.log
