@@ -318,9 +318,9 @@ def NNTester():
     learn = theano.function([nn.x, y], error, updates=dupdates)
     predict = theano.function([nn.x], nn.out)
 
-    start_time = time.clock()
+    start_time = time.perf_counter()
     train_error = miniBatchLearning(images, labels, -1, learn, verbose=True, epochs=50)
-    print('Time taken:', (time.clock() - start_time))
+    print('Time taken:', (time.perf_counter() - start_time))
     
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
