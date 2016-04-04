@@ -8,6 +8,7 @@ from theano import config
 import numpy as np
 import struct
 import matplotlib.pyplot as plt
+import time
 
 sys.setrecursionlimit(10000)
 
@@ -267,7 +268,7 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
 def AETester():
     images, labels = readMNISTData(10000)
     xcv, ycv = readcv(1)
-
+    
     try:
         prevEncoder = open('autoencoder.pkl', 'rb')
         ae = pickle.load(prevEncoder)
@@ -317,7 +318,9 @@ def NNTester():
     learn = theano.function([nn.x, y], error, updates=dupdates)
     predict = theano.function([nn.x], nn.out)
 
-    train_error = miniBatchLearning(images, labels, 500, learn, verbose=True, epochs=50)
+    start_time = time.clock()
+    train_error = miniBatchLearning(images, labels, -1, learn, verbose=True, epochs=50)
+    print('Time taken:', (time.clock() - start_time))
     
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
@@ -326,4 +329,4 @@ def NNTester():
     print(accuracy / ycv.shape[0])
 
 if __name__ == '__main__':
-    AETester()
+    NNTester()
