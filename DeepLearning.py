@@ -108,6 +108,10 @@ class Layer:
                 self.out = T.dot(x, self.w) + self.b
             self.params = [self.w, self.b]
 
+    def getOutput(self, x,  nonlinearity=T.nnet.sigmoid):
+        out = nonlinearity(T.dot(x, self.w) + self.b)
+        return out
+
 def generateVanillaUpdates(params, alpha, error):
     grad = []
     for p in params:
@@ -205,8 +209,28 @@ class AutoEncoder:
 
         print('Finished initialization')
 
-    def learn(self,x, y, mode='vanilla'):
-        pass
+    def learn(self,x, y, mode='vanilla', iterations=10):
+        def getEncDecPair(layer):
+            encoder = self.encode[layer]
+            decoder = self.decode[-(layer + 1)]
+            return (encoder, decoder)
+
+        def getLearningFunction(layer, x, y):
+            encoder, decoder = getEndDecPair(layer)
+            
+            newOut = encoder.getOutput(x)
+            out = decoder.getOutput(newOut)
+
+            mse = T.mean(T.sqr(out - y))
+
+            return (x, mse)
+        
+        for i in range(self.encode):
+            for j in range(iterations):
+                pass
+        
+        #Warning: Not done at all
+
 
 class FFClassifier:
     def __init__(self, *dim, **kwargs):
@@ -236,14 +260,19 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
         for i in range(0, x.shape[0], batchSize):
             error = updateFunction(x[i:(i+batchSize)], y[i:(i+batchSize)])
             train_error.append(error)
-            if verbose: print('{0:14} Epoch: {1:4}'.format(np.round(error, 10), round((j +
+            if verbose: print('{0:10} Epoch: {1:4}'.format(np.round(error, 10), round((j +
                 (i/x.shape[0])), 2)))
     return train_error
 
 def AETester():
     images, labels = readMNISTData(10000)
     xcv, ycv = readcv(1)
-    ae = AutoEncoder(784, 600, init_size=1)
+
+    try:
+        prevEncoder = open('autoencoder.pkl', 'rb')
+        ae = pickle.load(prevEncoder)
+    except FileNotFoundError:
+        ae = AutoEncoder(784, 600, init_size=1)
 
 #    images = images / images.max()
 
@@ -259,18 +288,20 @@ def AETester():
     (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=1)
     (dupdates) = generateVanillaUpdates(ae.params, 0.001, mse)
 
-    learn = theano.function([ae.x, y], mse, updates=rpropupdates)
-    train_error = miniBatchLearning(images, images, -1, learn, verbose=True, epochs=100)
+    learn = theano.function([ae.x, y], mse, updates=dupdates)
+    train_error = miniBatchLearning(images, images, 500, learn, verbose=True, epochs=1)
+
+    pickle.dump(ae, open('autoencoder.pkl', 'wb'))
 
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 
     for i in range(len(images)):
-        generated_image = genImage(images[i].reshape(1, 784))
+        generated_image = np.clip(genImage(images[i].reshape(1, 784)), 0, 256)
         print("Min: {0:10} Max: {1:10}".format(generated_image.min(), generated_image.max()))
-        plt.imshow(generated_image.reshape(28, 28), cmap='Greys')
+        plt.imshow(generated_image.reshape(28, 28), cmap='Greys', interpolation='none')
         plt.figure()
-        plt.imshow(images[i].reshape(28, 28), cmap='Greys')
+        plt.imshow(images[i].reshape(28, 28), cmap='Greys', interpolation='none')
         plt.show()
 
 def NNTester():
