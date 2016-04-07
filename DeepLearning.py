@@ -225,12 +225,57 @@ class AutoEncoder:
             mse = T.mean(T.sqr(out - y))
 
             return (x, mse)
-        
+
         for i in range(self.encode):
             for j in range(iterations):
                 pass
         
         #Warning: Not done at all
+
+class ConvolutionLayer:
+    def __init__(self, shape, in_var=T.matrix('input'), nonlinearity=T.nnet.sigomid, init_size=0.1,
+            deconv=False):
+        if nonlinearity == None:
+            def na(x):
+                return x
+            nonlinearty = na
+        x = in_var
+        filt = theano.shared(value=(np.random.rand(shape) * 0.5 - 1) *
+                init_size).astype(theano.config.floatX)
+
+        #If bias needs to be applied to every hidden unit, it should be 3d
+        bias = theano.shared(value=(np.random.rand(shape[1]) * 0.5 - 1) * 
+                init_size).astype(theano.config.floatX)
+        if deconv:
+            z = T.nnet.conv2d(x, filt, border_mode='full', subsample = (1,1))
+        else:
+            z = T.nnet.conv2d(x, filt, border_mode='valid', subsample=(1,1))
+
+        self.out = nonlinearity(z + bias.dimshuffle('x', 0, 'x', 'x'))
+        self.w = filt
+        self.b = bias
+        self.params = [filt + bias]
+
+class ConvolutionalAutoEncoder:
+    '''
+    Reminder: The goal of this is purely to make dreams, nothing else
+    '''
+    def __init__(self, *dim, **kwargs):
+
+        x = T.tensor4('input')
+        self.x = x
+        init_size = kwargs.get('init_size', 0.1)
+
+        layers = []
+        layers.append(ConvolutionLayer(dim[0], in_var=x, init_size=init_size, deconv=False))
+        for i in range(1, len(dim)):
+            layers.append(ConvolutionLayer(dim[i], in_var=layers[-1].out, init_size=init_size, deconv=False))
+
+        decoder = []
+        self.out = layers[-1].out
+
+        #gotta implement the decoding step lol
+        pass
 
 
 class FFClassifier:
@@ -266,14 +311,14 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
     return train_error
 
 def AETester():
-    images, labels = readMNISTData(10000)
+    images, labels = readMNISTData(1000)
     xcv, ycv = readcv(1)
     
     try:
         prevEncoder = open('autoencoder.pkl', 'rb')
         ae = pickle.load(prevEncoder)
     except FileNotFoundError:
-        ae = AutoEncoder(784, 600, init_size=1)
+        ae = AutoEncoder(784, 600, init_size=0.1)
 
 #    images = images / images.max()
 
@@ -285,20 +330,20 @@ def AETester():
     
     crossEntrop = -T.mean(yl * T.log(ae.out) + (1 - yl) * T.log(1 - ae.out))
 
-    (momentumStorage, updates) = generateMomentumUpdates(ae.params, 0.9, 10, mse)
-    (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=1)
+    (momentumStorage, updates) = generateMomentumUpdates(ae.params, 0.5, 0.1, mse)
+    (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=0.1)
     (dupdates) = generateVanillaUpdates(ae.params, 0.001, mse)
 
-    learn = theano.function([ae.x, y], mse, updates=dupdates)
-    train_error = miniBatchLearning(images, images, 500, learn, verbose=True, epochs=1)
+    learn = theano.function([ae.x, y], mse, updates=rpropupdates)
+    train_error = miniBatchLearning(images, images, -1, learn, verbose=True, epochs=1000)
 
-    pickle.dump(ae, open('autoencoder.pkl', 'wb'))
+#    pickle.dump(ae, open('autoencoder.pkl', 'wb'))
 
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 
     for i in range(len(images)):
-        generated_image = np.clip(genImage(images[i].reshape(1, 784)), 0, 256)
+        generated_image =genImage(images[i].reshape(1, 784))
         print("Min: {0:10} Max: {1:10}".format(generated_image.min(), generated_image.max()))
         plt.imshow(generated_image.reshape(28, 28), cmap='Greys', interpolation='none')
         plt.figure()
@@ -328,5 +373,8 @@ def NNTester():
     accuracy = np.sum(np.equal(np.argmax(predict(xcv), axis=1), np.argmax(ycv, axis=1)))
     print(accuracy / ycv.shape[0])
 
+def ConvolutionDreamerTest():
+    conv = ConvolutionalAutoEncoder((2, 3, 4))
+
 if __name__ == '__main__':
-    NNTester()
+    AETester()

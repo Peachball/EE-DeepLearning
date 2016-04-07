@@ -25,13 +25,10 @@ class RBMLayer:
         self.out = distribution(T.dot(hidden, self.w.T) + self.b)
         self._getSample = theano.function([in_var], self.out)
 
-    def CDUpdates(self, x, alpha):
+    def CDUpdates(self, x, alpha, negativeSample):
 
-        def persistentCD():
-            pass
         updates = []
 
-        negativeSample = T.matrix('neg sample')
         #Weight updates
         hidden = self.distribution(T.dot(x, self.w) + self.b)
         negHidden = self.distribution(T.dot(negativeSample, self.w) + self.b)
@@ -40,16 +37,14 @@ class RBMLayer:
         updates.append((self.w, self.w + alpha * (weightGrad)))
 
         #Bias updates
-        updates.append((self.b, self.b + alpha * (x - negativeSample)))
-        updates.append((self.c, self.c + alpha * (hidden - negHidden)))
-
+        updates.append((self.b, self.b + T.mean(alpha * (x - negativeSample))))
+        updates.append((self.c, self.c + T.mean(alpha * (hidden - negHidden))))
         return updates
 
     def gibbSample(self, startSample, k=1):
         sample = startSample
         for i in range(k):
             sample = self._getSample(sample)
-
         return sample
 
 def RBMTester():
@@ -65,9 +60,9 @@ def RBMTester():
     mse = T.mean(T.sqr(rbm.out - y))
 
     negSample = theano.shared(value=rbm.gibbSample(images)).astype(theano.config.floatX)
-    updates = rbm.CDUpdates(rbm.in_var, 0.01)
+    updates = rbm.CDUpdates(rbm.in_var, 0.01, negSample)
 
-    learn = theano.function([rbm.in_var, y], mse, updates=updates)
+    learn = theano.function([rbm.in_var, y], mse, updates=updates, mode='DebugMode')
 
     print(learn(images, images))
     

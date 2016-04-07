@@ -5,3 +5,4 @@ __pycache__/
 *.dvi
 *.log
 *~
+autoencoder.pkl
