@@ -233,15 +233,15 @@ class AutoEncoder:
         #Warning: Not done at all
 
 class ConvolutionLayer:
-    def __init__(self, shape, in_var=T.matrix('input'), nonlinearity=T.nnet.sigomid, init_size=0.1,
+    def __init__(self, shape, in_var=T.matrix('input'), nonlinearity=T.nnet.sigmoid, init_size=0.1,
             deconv=False):
         if nonlinearity == None:
             def na(x):
                 return x
             nonlinearty = na
         x = in_var
-        filt = theano.shared(value=(np.random.rand(shape) * 0.5 - 1) *
-                init_size).astype(theano.config.floatX)
+        self.x = x
+        filt = theano.shared(value=(np.random.uniform(low=-1.0, high=1.0, size=shape) * init_size)).astype(theano.config.floatX)
 
         #If bias needs to be applied to every hidden unit, it should be 3d
         bias = theano.shared(value=(np.random.rand(shape[1]) * 0.5 - 1) * 
@@ -254,7 +254,7 @@ class ConvolutionLayer:
         self.out = nonlinearity(z + bias.dimshuffle('x', 0, 'x', 'x'))
         self.w = filt
         self.b = bias
-        self.params = [filt + bias]
+        self.params = [filt, bias]
 
 class ConvolutionalAutoEncoder:
     '''
@@ -266,18 +266,37 @@ class ConvolutionalAutoEncoder:
         self.x = x
         init_size = kwargs.get('init_size', 0.1)
 
-        layers = []
-        layers.append(ConvolutionLayer(dim[0], in_var=x, init_size=init_size, deconv=False))
+        encode = []
+        encode.append(ConvolutionLayer(dim[0], in_var=x, init_size=init_size, deconv=False))
         for i in range(1, len(dim)):
-            layers.append(ConvolutionLayer(dim[i], in_var=layers[-1].out, init_size=init_size, deconv=False))
+            encode.append(ConvolutionLayer(dim[i], in_var=layers[-1].out, init_size=init_size, deconv=False))
 
         decoder = []
-        self.out = layers[-1].out
+        self.out = encode[-1].out
 
+        def swapElements(dimension):
+            d = list(dimension)
+            d[0], d[1] = d[1], d[0]
+            return tuple(d)
+
+        decoder.append(ConvolutionLayer(dim[-1], in_var=encode[-1].out, init_size=init_size,
+            deconv=True))
         #gotta implement the decoding step lol
-        pass
+        for i in range(2, len(dim)):
+            nonlinearity = T.nnet.sigmoid
+            if i == len(dim) - 1:
+                nonlinearity = None
+            decoder.append(ConvolutionLayer(dim[-i], in_var=decoder[-1].out, init_size=init_size,
+                deconv=True, nonlinearity=nonlinearity))
+        
+        self.reconstructed = decoder[-1].out
 
+        layers = encode + decoder
 
+        self.params = []
+        for l in layers:
+            self.params += l.params
+        
 class FFClassifier:
     def __init__(self, *dim, **kwargs):
         
@@ -374,7 +393,61 @@ def NNTester():
     print(accuracy / ycv.shape[0])
 
 def ConvolutionDreamerTest():
-    conv = ConvolutionalAutoEncoder((2, 3, 4))
+    conv = ConvolutionalAutoEncoder((2, 3, 15, 15))
+
+    i = 0
+
+    def googleImageDownloader(start=0):
+        from apiclient.discovery import build
+        nonlocal i
+
+        service = build("customsearch", "v1",
+               developerKey="AIzaSyBkd2lwAWzEKWjRbB2rlRM5OU_OBvz7u5w")
+        
+        res = service.cse().list(
+            q='flower',
+            cx='015897475084883013797:9dpu7012l6o',
+            searchType='image',
+            num=10,
+            start=start,
+            imgType='photo',
+            fileType='png',
+            imgSize='huge',
+            safe= 'off').execute()
+
+        import urllib.request as urllib
+        def downloadImage(url, i):
+            urllib.urlretrieve(url, 'imageDataSet/' + str(i))
+
+        if not 'items' in res:
+            print ('No result !!\nres is: {}'.format(res))
+        else:
+            for item in res['items']:
+                print('{}:\n\t{}'.format(item['title'], item['link']))
+                i += 1
+                try:
+                    downloadImage(item['link'], i)
+                except:
+                    print('Failed to download:', item['title'])
+
+    from PIL import Image
+    def convertImageToArray(index):
+        filename = 'imageDataSet/' + str(index)
+        im = Image.open(filename)
+        im.load()
+        return np.asarray(im)
+
+    images = []
+    for i in range(1, 2):
+        try:
+            images.append(convertImageToArray(i)[:, :, :3])
+        except FileNotFoundError:
+            pass
+
+    plt.imshow(images[0])
+    plt.show()
+    reconstruct = theano.function([conv.x], conv.out)
+    reconstruct(np.expand_dims(images[0], axis=0))
 
 if __name__ == '__main__':
-    AETester()
+    ConvolutionDreamerTest()
