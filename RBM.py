@@ -64,6 +64,7 @@ def RBMTester():
 
     learn = theano.function([rbm.in_var, y], mse, updates=updates, mode='DebugMode')
 
+    theano.printing.pydotprint(learn, outfile='rbm.pdp')
     print(learn(images, images))
     
     sampled = rbm.gibbSample(images)

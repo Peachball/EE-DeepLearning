@@ -279,16 +279,17 @@ class ConvolutionalAutoEncoder:
             d[0], d[1] = d[1], d[0]
             return tuple(d)
 
-        decoder.append(ConvolutionLayer(dim[-1], in_var=encode[-1].out, init_size=init_size,
+        decoder.append(ConvolutionLayer(swapElements(dim[-1]), in_var=encode[-1].out, init_size=init_size,
             deconv=True))
         #gotta implement the decoding step lol
         for i in range(2, len(dim)):
             nonlinearity = T.nnet.sigmoid
             if i == len(dim) - 1:
                 nonlinearity = None
-            decoder.append(ConvolutionLayer(dim[-i], in_var=decoder[-1].out, init_size=init_size,
+            decoder.append(ConvolutionLayer(swapElements(dim[-i]), in_var=decoder[-1].out, init_size=init_size,
                 deconv=True, nonlinearity=nonlinearity))
         
+        print(decoder[-1].w.get_value().shape)
         self.reconstructed = decoder[-1].out
 
         layers = encode + decoder
@@ -445,9 +446,10 @@ def ConvolutionDreamerTest():
             pass
 
     plt.imshow(images[0])
+    print(images[0].shape)
     plt.show()
     reconstruct = theano.function([conv.x], conv.out)
-    reconstruct(np.expand_dims(images[0], axis=0))
+    reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
 
 if __name__ == '__main__':
     ConvolutionDreamerTest()
