@@ -1,2 +1,10 @@
 musicDataSet/*
 *.swp
+__pycache__/
+*.aux
+*.dvi
+*.log
+*~
+autoencoder.pkl
+imageDataSet/*
+*.pyc
