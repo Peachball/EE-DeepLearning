@@ -187,9 +187,9 @@ def matplotlibQuitter(event):
         quit()
 
 def AETester():
-    images, labels = readMNISTData(10000)
+    images, labels = readMNISTData(100)
     xcv, ycv = readcv(1)
-    ae = AutoEncoder(784, 600, 500, init_size=10)
+    ae = AutoEncoder(784, 600, init_size=10)
 
 #    images = images / images.max()
 
@@ -202,7 +202,7 @@ def AETester():
     crossEntrop = -T.mean(yl * T.log(ae.out) + (1 - yl) * T.log(1 - ae.out))
 
     (momentumStorage, updates) = generateMomentumUpdates(ae.params, 0.9, 10, mse)
-    (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=0.01)
+    (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=0.001)
 
     learn = theano.function([ae.x, y], mse, updates=rpropupdates)
     train_error = []
