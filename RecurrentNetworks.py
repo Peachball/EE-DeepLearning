@@ -1,6 +1,7 @@
 import numpy as np
 import theano
 import theano.tensor as T
+from theano import config
 
 class LSTMLayer:
     '''
@@ -17,7 +18,6 @@ class LSTMLayer:
         self.cell_size = cell_size
         self.C = theano.shared(value=np.zeros((1, cell_size)), name='LongTerm')
         self.h = theano.shared(value=np.zeros((1, out_size)), name='Previous Prediction')
-        self.momentum = momentum
         if in_var == None:
             x = T.matrix(name='input example')
         else:
@@ -110,3 +110,65 @@ class LSTMLayer:
         self.cell_state = cell_state
         output = actualOutput.reshape((actualOutput.shape[0], actualOutput.shape[2]))
         self.out = output
+
+class LSTM():
+
+    def __init__(self, *dim, **kwargs):
+        self.alpha = kwargs.get('alpha', 0.01)
+        self.momentum = kwargs.get('momentum', 0)
+        rprop = kwargs.get('rprop', False)
+        out_type = kwargs.get('out_type', 'sigmoid')
+        self.layers = []
+        verbose = kwargs.get('verbose', False)
+        init_size = kwargs.get('init_size', 0.01)
+        x = T.matrix('Input')
+        y = T.matrix('Output')
+        self.x = x
+        self.y = y
+        init_size = kwargs.get('init_size', 1e-10)
+        self.layers.append(LSTMLayer(dim[0], dim[1], in_var=x, verbose=False))
+        for i in range(1, len(dim) - 1):
+            self.layers.append(LSTMLayer(dim[i], dim[i+1], in_var=self.layers[-1].out, init_size=init_size, out_type='sigmoid'))
+            if i == len(dim)-2:
+                self.layers[-1] = LSTMLayer(dim[i], dim[i+1], in_var=self.layers[-2].out, out_type=out_type, init_size=init_size)
+        
+
+        if verbose: 
+            print('Number of layers:' + str(len(self.layers)))
+            print('Finished with initialization of layers -> Defining prediction')
+
+        #Defining updates for all layers:
+        layerUpdates = []
+        for l in self.layers:
+            layerUpdates.append((l.C, l.cell_state[-1]))
+            layerUpdates.append((l.h, l.hidden[-1]))
+
+        #Define prediction:
+        prediction = self.layers[-1].out
+        self.predict = theano.function([x], prediction, updates=layerUpdates)
+
+        if verbose:
+            print('Defining error')
+        #Define Error
+        if out_type=='sigmoid':
+            self.error = -T.mean((y)*T.log(T.clip(prediction, 1e-9, 1-1e-9)) +
+                    (1-y)*T.log(1-T.clip(prediction, 1e-9, 1-1e-9)))
+        elif out_type=='linear':
+            self.error = T.mean(T.sqr(y - prediction))
+        
+        if verbose:
+            print('Wrapping paramaters')
+        #Define paramater list
+        self.params = []
+        for i in self.layers:
+            self.params = self.params + i.params
+
+
+    def resetGrad(self):
+        for sumGrad in self.summedGradients:
+            sumGrad.set_value(np.zeros(sumGrad.shape))
+
+    def reset(self):
+        for l in self.layers:
+            l.reset()
+        return

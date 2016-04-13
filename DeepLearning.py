@@ -132,7 +132,7 @@ def generateMomentumUpdates(params, momentum, alpha, error):
         zip(mparams, grad)))
     return ([gradUpdates, mparams], gradUpdates)
 
-def generateRpropUpdates(params, error, init_size=1):
+def generateRpropUpdates(params, error, init_size=1, verbose=False):
     prevw = []
     deltaw = []
     updates = []
@@ -142,9 +142,12 @@ def generateRpropUpdates(params, error, init_size=1):
         prevw.append(theano.shared(np.zeros(p.get_value().shape)).astype(config.floatX))
         deltaw.append(theano.shared(init_size *  np.ones(p.get_value().shape)).astype(config.floatX))
 
+    iterations = 0
     for p, dw, pw in zip(params, deltaw, prevw):
         try:
+            if verbose: print("\rGradient {} out of {}".format(iterations + 1, len(params)), end="")
             gradients.append(T.grad(error, p))
+            iterations += 1
         except Exception:
             print('Unused input')
             continue
@@ -160,6 +163,7 @@ def generateRpropUpdates(params, error, init_size=1):
         updates.append((pw, (T.sgn(gradients[-1]) * dw * (T.eq(diffW, 0)))))
     
     storage = prevw + deltaw
+    print("\nDone with updates")
 
     return (storage, updates)
 
@@ -379,9 +383,9 @@ def NNTester():
     learn = theano.function([nn.x, y], error, updates=dupdates)
     predict = theano.function([nn.x], nn.out)
 
-    start_time = time.perf_counter()
-    train_error = miniBatchLearning(images, labels, -1, learn, verbose=True, epochs=50)
-    print('Time taken:', (time.perf_counter() - start_time))
+    start_time = time.clock()
+    train_error = miniBatchLearning(images, labels, -1, learn, verbose=True, epochs=10)
+    print('Time taken:', (time.clock() - start_time))
     
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
