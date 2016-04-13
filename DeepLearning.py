@@ -335,14 +335,10 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
     return train_error
 
 def AETester():
-    images, labels = readMNISTData(1000)
+    images, labels = readMNISTData(100)
     xcv, ycv = readcv(1)
+    ae = AutoEncoder(784, 600, init_size=10)
     
-    try:
-        prevEncoder = open('autoencoder.pkl', 'rb')
-        ae = pickle.load(prevEncoder)
-    except FileNotFoundError:
-        ae = AutoEncoder(784, 600, init_size=0.1)
 
 #    images = images / images.max()
 
