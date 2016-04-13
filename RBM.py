@@ -32,13 +32,14 @@ class RBMLayer:
         #Weight updates
         hidden = self.distribution(T.dot(x, self.w) + self.b)
         negHidden = self.distribution(T.dot(negativeSample, self.w) + self.b)
-        weightGrad = T.dot(x, hidden) / x.shape[0] - T.dot(negativeSample, negHidden) / \
-            negativeSample.shape[0]
-        updates.append((self.w, self.w + alpha * (weightGrad)))
+        print(hidden.shape, negHidden.shape)
+#        weightGrad = T.dot(x, hidden) / x.shape[0] - T.dot(negativeSample, negHidden) / \
+#            negativeSample.shape[0]
+#        updates.append((self.w, self.w + alpha * (weightGrad)))
 
         #Bias updates
-        updates.append((self.b, self.b + T.mean(alpha * (x - negativeSample))))
-        updates.append((self.c, self.c + T.mean(alpha * (hidden - negHidden))))
+#        updates.append((self.b, self.b + T.mean(alpha * (x - negativeSample))))
+        updates.append((self.c, self.c + (alpha * (hidden - negHidden))))
         return updates
 
     def gibbSample(self, startSample, k=1):
@@ -60,17 +61,20 @@ def RBMTester():
     mse = T.mean(T.sqr(rbm.out - y))
 
     negSample = theano.shared(value=rbm.gibbSample(images)).astype(theano.config.floatX)
+    print(rbm.c.get_value().shape)
     updates = rbm.CDUpdates(rbm.in_var, 0.01, negSample)
 
     learn = theano.function([rbm.in_var, y], mse, updates=updates, mode='DebugMode')
 
-    theano.printing.pydotprint(learn, outfile='rbm.pdp')
     print(learn(images, images))
     
     sampled = rbm.gibbSample(images)
 
+    print("ok lol")
     plt.imshow(sampled[0].reshape(28, 28), cmap='Greys', interpolation='none')
     plt.show()
+    
+
 if __name__== '__main__':
     RBMTester()
 
