@@ -84,11 +84,20 @@ def readcv(length=10000):
 
 class Layer:
     def __init__(self, in_size, out_size, layer_type='sigmoid', in_var=None,
-            init_size=0.1):
+            init_size=0.1, nonlinearity=None):
         self.in_size = in_size
         self.out_size = out_size
-        if not layer_type in ['sigmoid', 'tanh', 'lstm', 'rnn', 'linear']:
+        self.nonlinearity = nonlinearity
+        if not layer_type in ['sigmoid', 'tanh', 'lstm', 'rnn', 'linear', 'rlu'] and nonlinearity==None:
             raise Exception('Layer type is invalid: ' + str(layer_type))
+        
+        if nonlinearity==None:
+            if layer_type == 'sigmoid':
+                nonlinearity = T.nnet.sigmoid
+            if layer_type = 'tanh':
+                nonlinearity = T.tanh
+            if layer_type == 'linear':
+                nonlinearity = lambda x: rx
         
         if in_var==None:
             x = T.matrix('Input')
@@ -101,12 +110,7 @@ class Layer:
                     init_size).astype(theano.config.floatX)
             self.b = theano.shared((np.random.rand(out_size) - 0.5) *
                     init_size).astype(theano.config.floatX)
-            if layer_type == 'sigmoid':
-                self.out = T.nnet.sigmoid( T.dot(x, self.w) + self.b )
-            if layer_type == 'tanh':
-                self.out = T.tanh( T.dot(x, self.w) + self.b )
-            if layer_type == 'linear':
-                self.out = T.dot(x, self.w) + self.b
+            self.out = nonlinearity(T.dot(x, self.w) + self.b )
             self.params = [self.w, self.b]
 
     def getOutput(self, x,  nonlinearity=T.nnet.sigmoid):
