@@ -3,6 +3,7 @@ import theano
 import theano.tensor as T
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 from DeepLearning import readMNISTData, readcv
 
 class RBMLayer:
@@ -27,7 +28,7 @@ class RBMLayer:
         self._getSample = theano.function([in_var], self.out)
 
         self.persistentCD = theano.shared(value=(np.random.rand(persistent_updatesize,
-            in_size)-0.5)*init_size, name='Persistent CD')
+            in_size)-0.5)*init_size, name='Persistent CD').astype(theano.config.floatX)
 
     def CDUpdates(self, x, alpha):
 
@@ -84,7 +85,8 @@ def RBMTester():
 
     learn = theano.function([rbm.in_var, y], mse, updates=updates)
 
-    rbm.miniBatch(learn, images, verbose=True, epochs=100)
+
+    rbm.miniBatch(learn, images, verbose=True, epochs=10)
     sampled = rbm.gibbSample(images)
 
     for i in range(10):

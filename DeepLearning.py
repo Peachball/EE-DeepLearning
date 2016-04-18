@@ -12,8 +12,6 @@ import time
 
 sys.setrecursionlimit(10000)
 
-theano.config.floatX = 'float64'
-
 def readMNISTData(length=10000):
     images = open('train-images-idx3-ubyte', 'rb')
     labels = open('train-labels-idx1-ubyte', 'rb')
@@ -94,10 +92,12 @@ class Layer:
         if nonlinearity==None:
             if layer_type == 'sigmoid':
                 nonlinearity = T.nnet.sigmoid
-            if layer_type = 'tanh':
+            if layer_type == 'tanh':
                 nonlinearity = T.tanh
             if layer_type == 'linear':
-                nonlinearity = lambda x: rx
+                nonlinearity = lambda x: x
+            if layer_type == 'rlu':
+                nonlinearity = lambda x: T.log(1 + T.power(np.e, x))
         
         if in_var==None:
             x = T.matrix('Input')
@@ -105,13 +105,12 @@ class Layer:
         else:
             x = in_var
         
-        if layer_type in ['sigmoid', 'tanh', 'linear']:
-            self.w = theano.shared((np.random.rand(in_size, out_size) - 0.5) *
-                    init_size).astype(theano.config.floatX)
-            self.b = theano.shared((np.random.rand(out_size) - 0.5) *
-                    init_size).astype(theano.config.floatX)
-            self.out = nonlinearity(T.dot(x, self.w) + self.b )
-            self.params = [self.w, self.b]
+        self.w = theano.shared((np.random.rand(in_size, out_size).astype(theano.config.floatX) - 0.5) *
+                init_size).astype(theano.config.floatX)
+        self.b = theano.shared((np.random.rand(out_size).astype(theano.config.floatX) - 0.5) *
+                init_size).astype(theano.config.floatX)
+        self.out = nonlinearity(T.dot(x, self.w) + self.b )
+        self.params = [self.w, self.b]
 
     def getOutput(self, x,  nonlinearity=T.nnet.sigmoid):
         out = nonlinearity(T.dot(x, self.w) + self.b)
@@ -305,7 +304,8 @@ class ConvolutionalAutoEncoder:
         self.params = []
         for l in layers:
             self.params += l.params
-        
+
+
 class FFClassifier:
     def __init__(self, *dim, **kwargs):
         
@@ -384,12 +384,12 @@ def NNTester():
 
     dupdates = generateVanillaUpdates(nn.params, 0.00001, error)
 
-    learn = theano.function([nn.x, y], error, updates=dupdates)
-    predict = theano.function([nn.x], nn.out)
+    learn = theano.function([nn.x, y], error, updates=dupdates, allow_input_downcast=True)
+    predict = theano.function([nn.x], nn.out, allow_input_downcast=True)
 
-    start_time = time.clock()
-    train_error = miniBatchLearning(images, labels, -1, learn, verbose=True, epochs=10)
-    print('Time taken:', (time.clock() - start_time))
+    start_time = time.perf_counter()
+    train_error = miniBatchLearning(images, labels, -1, learn, verbose=True, epochs=50)
+    print('Time taken:', (time.perf_counter() - start_time))
     
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
@@ -402,6 +402,7 @@ def ConvolutionDreamerTest():
 
     i = 0
 
+    '''
     def googleImageDownloader(start=0):
         from apiclient.discovery import build
         nonlocal i
@@ -434,7 +435,7 @@ def ConvolutionDreamerTest():
                     downloadImage(item['link'], i)
                 except:
                     print('Failed to download:', item['title'])
-
+    '''
     from PIL import Image
     def convertImageToArray(index):
         filename = 'imageDataSet/' + str(index)
@@ -456,4 +457,4 @@ def ConvolutionDreamerTest():
     reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
 
 if __name__ == '__main__':
-    ConvolutionDreamerTest()
+    NNTester()

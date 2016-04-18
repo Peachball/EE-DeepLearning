@@ -3,6 +3,31 @@ import theano
 import theano.tensor as T
 from theano import config
 
+class RecurrentLayer:
+
+    def __init(self, in_size, out_size, in_var=T.matrix('input'),
+            init_size=0.01, verbose=False, hidden_size=None):
+        x = in_var
+        self.x = x
+        if hidden_size == None:
+            hidden_size = max(in_size, out_size)
+
+        self.w_io = theano.shared(value=(np.random.rand(in_size, out_size) - 0.5) *
+                init_size).astype(theano.config.floatX)
+        self.b_io = theano.shared(value=(np.random.rand(out_size) - 0.5) *
+                init_size).astype(theano.config.floatX)
+
+        self.w_h = theano.shared(value=(np.random.rand(in_size, hidden_size) -
+            0.5) * init_size).astype(theano.config.floatX)
+        self.b_h = theano.shared(value=(np.random.rand(hidden_size) - 0.5) *
+                init_size).astype(theano.config.floatX)
+
+        self.hidden = theano.shared(
+                value=np.zeros(hidden_size)).astype(theano.config.floatX)
+
+        #To be continued...
+
+
 class LSTMLayer:
     '''
         This assumes that in this recurrent net, there is a corresponding output to each input
