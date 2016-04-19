@@ -120,7 +120,7 @@ def generateVanillaUpdates(params, alpha, error):
     grad = []
     for p in params:
         grad.append(T.grad(error, p))
-    updates = [(p, p - g) for p, g in zip(params, grad)]
+    updates = [(p, p - g * alpha) for p, g in zip(params, grad)]
 
     return updates
 

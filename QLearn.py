@@ -1,4 +1,5 @@
 from __future__ import print_function
+import random
 import time
 import pygame
 import numpy as np
@@ -114,8 +115,8 @@ def display(board, win):
 
 def convertBoard(board, style='legit'):
     [size, head] = evalSize(board)
-    output = [0] * len(board) * len(board[0]) * 2
     if style=='legit':
+        output = [0] * len(board) * len(board[0]) * 2
         for i in range(len(board)):
             for j in range(len(board[0])):
                 xpo = i - head[0]
@@ -129,6 +130,28 @@ def convertBoard(board, style='legit'):
                     output[2 * (xpo * len(board[0]) + ypo)] = board[i][j]
                 if board[i][j] < 0:
                     output[2 * (xpo * len(board[0]) + ypo)] = 1
+        return output
+    
+    if style=='shady':
+        output = []
+        for i in range(len(board)):
+            for j in range(len(board[0])):
+                if board[i][j] > 0:
+                    output.append(board[i][j])
+                    output.append(0)
+                    [_, head] = evalSize(board)
+                    if head[0] == i and head[1] == j:
+                        output.append(1)
+                    else:
+                        output.append(0)
+                elif board[i][j] < 0:
+                    output.append(0)
+                    output.append(1)
+                    output.append(0)
+                else:
+                    output.append(0)
+                    output.append(0)
+                    output.append(0)
         return output
 
 def predict(prediction, temperature=1):
@@ -150,15 +173,15 @@ def LearnSnake():
     b = createBoard(boardSize)
     b[0][1] = 1
     addApple(b)
-    q1 = FFClassifier(boardSize * boardSize *2, 700, init_size=0.1)
-    q2 = Layer(700, 4, layer_type='rlu', init_size=0.1, in_var=q1.out)
+    q1 = FFClassifier(boardSize * boardSize * 3, 700, init_size=0.01)
+    q2 = Layer(700, 4, layer_type='rlu', init_size=0.01, in_var=q1.out)
 
     params = q1.params + q2.params
     out = q2.out
     y = T.matrix('output')
     mse = T.mean(T.sqr(out  - y))
 
-    updates = generateVanillaUpdates(params, 0.0001, mse)
+    updates = generateVanillaUpdates(params, 0.1, mse)
     (storage, rupdates) = generateRpropUpdates(params, mse, init_size=0.1)
     learn = theano.function([q1.x, y], mse, updates=updates)
     p = theano.function([q1.x], out)
@@ -169,34 +192,42 @@ def LearnSnake():
     print("time to watch some snake")
     #Snake Drawing things
     
-    lam = 0.9
+    lam = 1
     maxMoves = boardSize * boardSize // 2
     mem = []
-    cor = []
+    rew = []
+    act = []
+    nstate = []
     maxSize = 0
+    draw = False
+    style = 'shady'
+    if style == 'shady':
+        inputsize = 3 * boardSize ** 2
+    elif style=='legit':
+        inputsize = 2 * boardSize**2
+    temp = 1
     maxMoves = 1000
-    draw = True
     while True:
         moves = 0
         tooSlow = 0
         while True:
             moves += 1
-            bef = np.array(convertBoard(b)).reshape(1, boardSize * boardSize * 2)
+            bef = np.array(convertBoard(b, style=style)).reshape(1, inputsize)
             prediction = p(bef)
-            move = predict(prediction, temperature=1)
+            move = predict(prediction, temperature=temp)
 
             if draw:
                 clear(scr)
                 display(b, scr)
                 pygame.display.update()
             status = nextIter(b, move)
-            after = np.array(convertBoard(b)).reshape(1, boardSize * boardSize * 2)
+            after = np.array(convertBoard(b, style=style)).reshape(1, inputsize)
     
             r = 0
             tooSlow += 1
             if status > 0:
                 addApple(b)
-                r = 100
+                r = 1
                 tooSlow = 0
             end = False
             if status < 0 or tooSlow > maxMoves:
@@ -211,22 +242,47 @@ def LearnSnake():
                 correct = np.array([0]*4)
 
             mem.append(np.squeeze(bef))
-            cor.append(np.squeeze(correct))
+            nstate.append(np.squeeze(after))
+            act.append(move)
+            rew.append(r)
             print(p(bef))
             if end:
                 break
         [size, _] = evalSize(b)
         if size > maxSize:
             maxSize = size
-            print(size)
-        if len(mem) > 1000:
+            print("Max Size: ", size)
+        if len(mem) > 100:
+            def pickSamples(size=100):
+                samples = random.sample(range(len(mem)), size)
+                
+                return ([mem[i] for i in samples], 
+                        [rew[i] for i in samples],
+                        [act[i] for i in samples],
+                        [nstate[i] for i in samples])
+            (m, r, a, s) = pickSamples()
+            def getTarget(m, r, a, s):
+                cor = p(np.array(m))
+                cor[range(len(cor)),a] = lam * np.max(p(np.array(s)), axis=1) + r
+                '''
+                print(cor[range(len(cor)), a])
+                print("Prediction:", p(np.array(s)))
+                print("Rewards: ", r)
+                print("Actions: ", a)
+                print("Correct: ", cor)
+                raw_input('hm')
+                '''
+                return cor
+            cor = getTarget(m, r, a, s)
+            
+            def genData(size=100):
+                data = pickSamples()
+                return data[0], getTarget(data)
             error = 10
-            for j in range(10):
-                error = (learn(np.array(mem), np.array(cor)))
-                print(error)
-            mem = []
-            cor = []
-            print(error)
+            for j in range(100):
+                error = (learn(np.array(m), np.array(cor)))
+#                print(error)
+#            print(error)
         b = createBoard(boardSize)
         b[0][0] = 1
         addApple(b)
