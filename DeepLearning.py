@@ -4,6 +4,7 @@ import pickle
 from collections import OrderedDict
 import theano.tensor as T
 import theano
+from theano.compile.nanguardmode import NanGuardMode
 from theano import config
 import numpy as np
 import struct
@@ -121,7 +122,36 @@ def reset(params, init_size=0.1):
         p.set_value(np.random.uniform(low=-init_size, high=init_size, size=p.get_value().shape))
 
 
-def generateRmsProp(params, alpha, decay, error, momentum=0):
+def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1e-8):
+    updates = []
+    moment = []
+    vector = []
+    t = []
+    alpha = theano.shared(alpha)
+    for p in params:
+        shape = p.get_value().shape
+        grad = T.grad(error, p)
+        time = theano.shared(value=1.0).astype(theano.config.floatX)
+
+        m = theano.shared(value=np.zeros(shape), name="moment").astype(theano.config.floatX)
+        v = theano.shared(value=np.zeros(shape), name="moment 0").astype(theano.config.floatX)
+
+        m_t = decay1 * m + (1 - decay1) * grad
+        v_t = decay2 * v + (1 - decay2) * T.sqr(grad)
+        m_adj = m_t / (1.0 - T.pow(decay1, time))
+        v_adj = v_t / (1.0 - T.pow(decay2, time))
+        updates.append((m, m_t))
+        updates.append((v, v_t))
+        updates.append((p, p - alpha * m_adj / (T.sqrt(v_adj) + epsilon)))
+        updates.append((time, time+1))
+
+        moment.append(m)
+        vector.append(v)
+        t.append(time)
+
+    return ([moment, vector, t, alpha], updates)
+
+def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3):
     r = []
     v = []
     pr = []
@@ -135,7 +165,7 @@ def generateRmsProp(params, alpha, decay, error, momentum=0):
         v_t = theano.shared(np.zeros(shape)).astype(theano.config.floatX)
 
         new_r = (1 - decay) * T.sqr(grad) + decay * r_t
-        new_v = alpha / (T.sqrt(new_r) + 1e-3) * grad
+        new_v = alpha / (T.sqrt(new_r) + fudge) * grad
         updates.append((r_t, new_r))
         updates.append((v_t, new_v))
         updates.append((p, p - new_v))
@@ -145,15 +175,14 @@ def generateRmsProp(params, alpha, decay, error, momentum=0):
     return [[r, v, alpha], updates]
     #lmao not done here
 
-def generateVanillaUpdates(params, alpha, error):
+def generateVanillaUpdates(params, error, alpha=0.01):
     grad = []
     for p in params:
         grad.append(T.grad(error, p))
     updates = [(p, p - g * alpha) for p, g in zip(params, grad)]
-
     return updates
 
-def generateMomentumUpdates(params, momentum, alpha, error):
+def generateMomentumUpdates(params, error, alpha=0.01, momentum=0.5):
     grad = []
     for p in params:
         grad.append(T.grad(error, p))
@@ -411,24 +440,25 @@ def NNTester():
     nn = FFClassifier(784, 300, 10)
     error = -T.mean(y * T.log(nn.out) + (1-y) * T.log(1- nn.out))
 
-    dupdates = generateVanillaUpdates(nn.params, 0.001, error)
-    (storage, rmsupdates) = generateRmsProp(nn.params, 0.01, 0.9, error)
-    (storage, rprop) = generateRpropUpdates(nn.params, error, 0.1)
+    dupdates = generateVanillaUpdates(nn.params, error, alpha=0.01)
+    (s, adam) = generateAdam(nn.params, error, alpha=0.001)
+    (st, rprop) = generateRpropUpdates(nn.params, error, 0.1)
+    (sto, rms) = generateRmsProp(nn.params, error, alpha=0.01, decay=0.9)
 
-    learn = theano.function([nn.x, y], error, updates=dupdates, allow_input_downcast=True)
+    learn = theano.function([nn.x, y], error, updates=rprop, allow_input_downcast=True)
 
-    rmsprop = theano.function([nn.x, y], error, updates=rmsupdates, allow_input_downcast=True)
+    rmsprop = theano.function([nn.x, y], error, updates=adam, allow_input_downcast=True)
     predict = theano.function([nn.x], nn.out, allow_input_downcast=True)
 
     start_time = time.perf_counter()
     reset(nn.params)
-    train_error = miniBatchLearning(images, labels, 300, rmsprop, verbose=True, epochs=50)
+    train_error = miniBatchLearning(images, labels, -1, rmsprop, verbose=True, epochs=50)
     print('Time taken:', (time.perf_counter() - start_time))
     
     plt.plot(np.arange(len(train_error)), train_error)
     plt.figure()
     reset(nn.params)
-    train_error = miniBatchLearning(images, labels, 300, learn, verbose=True, epochs=50)
+    train_error = miniBatchLearning(images, labels, -1, learn, verbose=True, epochs=50)
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 
