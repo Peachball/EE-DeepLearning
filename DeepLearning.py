@@ -105,7 +105,7 @@ class Layer:
         else:
             x = in_var
         
-        self.w = theano.shared((np.random.rand(in_size, out_size).astype(theano.config.floatX) - 0.5) *
+        self.w = theano.shared((np.random.uniform(low=-init_size, high=init_size, size=(in_size, out_size)).astype(theano.config.floatX) - 0.5) *
                 init_size).astype(theano.config.floatX)
         self.b = theano.shared((np.random.rand(out_size).astype(theano.config.floatX) - 0.5) *
                 init_size).astype(theano.config.floatX)
@@ -115,6 +115,35 @@ class Layer:
     def getOutput(self, x,  nonlinearity=T.nnet.sigmoid):
         out = nonlinearity(T.dot(x, self.w) + self.b)
         return out
+
+def reset(params, init_size=0.1):
+    for p in params:
+        p.set_value(np.random.uniform(low=-init_size, high=init_size, size=p.get_value().shape))
+
+
+def generateRmsProp(params, alpha, decay, error, momentum=0):
+    r = []
+    v = []
+    pr = []
+    updates = []
+    alpha = theano.shared(alpha)
+    for p in params:
+        grad = T.grad(error, p)
+
+        shape = p.get_value().shape
+        r_t = theano.shared(np.zeros(shape)).astype(theano.config.floatX)
+        v_t = theano.shared(np.zeros(shape)).astype(theano.config.floatX)
+
+        new_r = (1 - decay) * T.sqr(grad) + decay * r_t
+        new_v = alpha / (T.sqrt(new_r) + 1e-3) * grad
+        updates.append((r_t, new_r))
+        updates.append((v_t, new_v))
+        updates.append((p, p - new_v))
+        r.append(r_t)
+        v.append(v_t)
+
+    return [[r, v, alpha], updates]
+    #lmao not done here
 
 def generateVanillaUpdates(params, alpha, error):
     grad = []
@@ -375,22 +404,31 @@ def AETester():
         plt.show()
 
 def NNTester():
-    images, labels = readMNISTData(60000)
-    xcv, ycv = readcv(10000)
+    images, labels = readMNISTData(6000)
+    xcv, ycv = readcv(1000)
 
     y = T.matrix('Correct Labels')
-    nn = FFClassifier(784, 1000, 10)
+    nn = FFClassifier(784, 300, 10)
     error = -T.mean(y * T.log(nn.out) + (1-y) * T.log(1- nn.out))
 
-    dupdates = generateVanillaUpdates(nn.params, 0.00001, error)
+    dupdates = generateVanillaUpdates(nn.params, 0.001, error)
+    (storage, rmsupdates) = generateRmsProp(nn.params, 0.01, 0.9, error)
+    (storage, rprop) = generateRpropUpdates(nn.params, error, 0.1)
 
     learn = theano.function([nn.x, y], error, updates=dupdates, allow_input_downcast=True)
+
+    rmsprop = theano.function([nn.x, y], error, updates=rmsupdates, allow_input_downcast=True)
     predict = theano.function([nn.x], nn.out, allow_input_downcast=True)
 
     start_time = time.perf_counter()
-    train_error = miniBatchLearning(images, labels, -1, learn, verbose=True, epochs=50)
+    reset(nn.params)
+    train_error = miniBatchLearning(images, labels, 300, rmsprop, verbose=True, epochs=50)
     print('Time taken:', (time.perf_counter() - start_time))
     
+    plt.plot(np.arange(len(train_error)), train_error)
+    plt.figure()
+    reset(nn.params)
+    train_error = miniBatchLearning(images, labels, 300, learn, verbose=True, epochs=50)
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 
