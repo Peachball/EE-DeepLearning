@@ -131,8 +131,9 @@ def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
 
         totalG = theano.shared(value=np.zeros(shape)).astype(theano.config.floatX)
 
-        updates.append((totalG, totalG + T.sqr(grad)))
-        updates.append((p, p - grad / (T.sqrt(totalG) + epsilon) * alpha))
+        new_g = totalG + T.sqr(grad)
+        updates.append((totalG, new_g))
+        updates.append((p, p - grad / (T.sqrt(new_g) + epsilon) * alpha))
         
         history.append(totalG)
 
@@ -188,7 +189,7 @@ def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1
 
         moment.append(m)
         vector.append(v)
-        print("\rDone with {}/{}".format(i+1, len(params)), end="")
+        if verbose: print("\rDone with {}/{}".format(i+1, len(params)), end="")
         i += 1
 
     return ([moment, vector, time, alpha], updates)
@@ -474,8 +475,8 @@ def AETester():
         plt.show()
 
 def NNTester():
-    images, labels = readMNISTData(6000)
-    xcv, ycv = readcv(1000)
+    images, labels = readMNISTData(60000)
+    xcv, ycv = readcv(10000)
 
     y = T.matrix('Correct Labels')
     nn = FFClassifier(784, 1000, 700, 500, 300, 10)
@@ -486,26 +487,26 @@ def NNTester():
     (st, rprop) = generateRpropUpdates(nn.params, error, 0.1)
     (sto, rms) = generateRmsProp(nn.params, error, alpha=0.001, decay=0.9)
     (stor, adadelta) = generateAdadelta(nn.params, error, alpha=1, decay=0.9)
+    (stora, adagrad) = generateAdagrad(nn.params, error, alpha=0.01)
 
-    learn = theano.function([nn.x, y], error, updates=rms, allow_input_downcast=True)
+    updateRules = [(dupdates, "SGD"), (adam, "Adam"), (rms, "RMS"), (adadelta, "Adadelta"), (adagrad, "Adagrad")]
 
-    testlearn = theano.function([nn.x, y], error, updates=adam, allow_input_downcast=True)
-    predict = theano.function([nn.x], nn.out, allow_input_downcast=True)
+    figure, ax = plt.subplots()
+    for u in updateRules:
+        reset(nn.params)
+        learn = theano.function([nn.x, y], error, updates=u[0], allow_input_downcast=True)
+        start_time = time.perf_counter()
+        train_error = miniBatchLearning(images, labels, 500, learn, verbose=False, epochs=500)
+        print(u[1], " took ", (time.perf_counter() - start_time))
+        ax.plot(np.arange(len(train_error)), train_error, label=u[1])
 
-    start_time = time.perf_counter()
-    reset(nn.params)
-    train_error = miniBatchLearning(images, labels, 300, testlearn, verbose=True, epochs=50)
-    print('Time taken:', (time.perf_counter() - start_time))
-    
-    plt.plot(np.arange(len(train_error)), train_error)
-    plt.figure()
-    reset(nn.params)
-    train_error = miniBatchLearning(images, labels, 300, learn, verbose=True, epochs=50)
-    plt.plot(np.arange(len(train_error)), train_error)
+    plt.yscale('log', nonposy='clip')
+    ax.legend(loc='upper right')
+    plt.xlabel("Iterations")
+    plt.ylabel("MSE")
+    figure.suptitle("Learning Style Comparison")
+    plt.savefig("lr_styles_deep.png")
     plt.show()
-
-    accuracy = np.sum(np.equal(np.argmax(predict(xcv), axis=1), np.argmax(ycv, axis=1)))
-    print(accuracy / ycv.shape[0])
 
 def ConvolutionDreamerTest():
     conv = ConvolutionalAutoEncoder((2, 3, 15, 15))
@@ -567,4 +568,4 @@ def ConvolutionDreamerTest():
     reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
 
 if __name__ == '__main__':
-    AETester()
+    NNTester()
