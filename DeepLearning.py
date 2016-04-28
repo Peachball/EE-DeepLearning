@@ -121,17 +121,59 @@ def reset(params, init_size=0.1):
     for p in params:
         p.set_value(np.random.uniform(low=-init_size, high=init_size, size=p.get_value().shape))
 
-
-def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1e-8):
+def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
     updates = []
-    moment = []
-    vector = []
-    t = []
-    alpha = theano.shared(alpha)
+    history = []
+    
     for p in params:
         shape = p.get_value().shape
         grad = T.grad(error, p)
-        time = theano.shared(value=1.0).astype(theano.config.floatX)
+
+        totalG = theano.shared(value=np.zeros(shape)).astype(theano.config.floatX)
+
+        updates.append((totalG, totalG + T.sqr(grad)))
+        updates.append((p, p - grad / (T.sqrt(totalG) + epsilon) * alpha))
+        
+        history.append(totalG)
+
+    return (history, updates)
+
+def generateAdadelta(params, error, decay=0.9, alpha=1, epsilon=1e-8):
+    updates = []
+    accUpdates = []
+    accGrad = []
+    for p in params:
+        shape = p.get_value().shape
+        grad = T.grad(error, p)
+        
+        Eg = theano.shared(value=np.zeros(shape)).astype(theano.config.floatX)
+        Ex = theano.shared(value=np.zeros(shape)).astype(theano.config.floatX)
+
+        new_g = decay * Eg + (1 - decay) * T.sqr(grad)
+
+        d_x = T.sqrt((Ex + epsilon) / (new_g + epsilon)) * grad * alpha
+        new_x = decay * Ex + (1 - decay) * T.sqr(d_x)
+
+        updates.append((p, p - d_x))
+        updates.append((Ex, new_x))
+        updates.append((Eg, new_g))
+
+        accUpdates.append(Ex)
+        accGrad.append(Eg)
+
+    return ([accUpdates, accGrad], updates)
+
+def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1e-8, verbose=False):
+    updates = []
+    moment = []
+    vector = []
+    alpha = theano.shared(alpha)
+    time = theano.shared(value=1.0).astype(theano.config.floatX)
+    updates.append((time, time+1))
+    i = 0
+    for p in params:
+        shape = p.get_value().shape
+        grad = T.grad(error, p)
 
         m = theano.shared(value=np.zeros(shape), name="moment").astype(theano.config.floatX)
         v = theano.shared(value=np.zeros(shape), name="moment 0").astype(theano.config.floatX)
@@ -143,13 +185,13 @@ def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1
         updates.append((m, m_t))
         updates.append((v, v_t))
         updates.append((p, p - alpha * m_adj / (T.sqrt(v_adj) + epsilon)))
-        updates.append((time, time+1))
 
         moment.append(m)
         vector.append(v)
-        t.append(time)
+        print("\rDone with {}/{}".format(i+1, len(params)), end="")
+        i += 1
 
-    return ([moment, vector, t, alpha], updates)
+    return ([moment, vector, time, alpha], updates)
 
 def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3):
     r = []
@@ -397,8 +439,8 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
     return train_error
 
 def AETester():
-    images, labels = readMNISTData(100)
-    xcv, ycv = readcv(1)
+    images, labels = readMNISTData(6000)
+    xcv, ycv = readcv(100)
     ae = AutoEncoder(784, 600, init_size=10)
     
 
@@ -412,12 +454,11 @@ def AETester():
     
     crossEntrop = -T.mean(yl * T.log(ae.out) + (1 - yl) * T.log(1 - ae.out))
 
-    (momentumStorage, updates) = generateMomentumUpdates(ae.params, 0.5, 0.1, mse)
+    (adamStorage, adam) = generateAdam(ae.params, mse, alpha=1)
     (rprop, rpropupdates) = generateRpropUpdates(ae.params, mse, init_size=0.1)
-    (dupdates) = generateVanillaUpdates(ae.params, 0.001, mse)
 
-    learn = theano.function([ae.x, y], mse, updates=rpropupdates)
-    train_error = miniBatchLearning(images, images, -1, learn, verbose=True, epochs=1000)
+    learn = theano.function([ae.x, y], mse, updates=adam)
+    train_error = miniBatchLearning(images, images, 100, learn, verbose=True, epochs=10)
 
 #    pickle.dump(ae, open('autoencoder.pkl', 'wb'))
 
@@ -437,28 +478,29 @@ def NNTester():
     xcv, ycv = readcv(1000)
 
     y = T.matrix('Correct Labels')
-    nn = FFClassifier(784, 300, 10)
+    nn = FFClassifier(784, 1000, 700, 500, 300, 10)
     error = -T.mean(y * T.log(nn.out) + (1-y) * T.log(1- nn.out))
 
     dupdates = generateVanillaUpdates(nn.params, error, alpha=0.01)
     (s, adam) = generateAdam(nn.params, error, alpha=0.001)
     (st, rprop) = generateRpropUpdates(nn.params, error, 0.1)
-    (sto, rms) = generateRmsProp(nn.params, error, alpha=0.01, decay=0.9)
+    (sto, rms) = generateRmsProp(nn.params, error, alpha=0.001, decay=0.9)
+    (stor, adadelta) = generateAdadelta(nn.params, error, alpha=1, decay=0.9)
 
-    learn = theano.function([nn.x, y], error, updates=rprop, allow_input_downcast=True)
+    learn = theano.function([nn.x, y], error, updates=rms, allow_input_downcast=True)
 
-    rmsprop = theano.function([nn.x, y], error, updates=adam, allow_input_downcast=True)
+    testlearn = theano.function([nn.x, y], error, updates=adam, allow_input_downcast=True)
     predict = theano.function([nn.x], nn.out, allow_input_downcast=True)
 
     start_time = time.perf_counter()
     reset(nn.params)
-    train_error = miniBatchLearning(images, labels, -1, rmsprop, verbose=True, epochs=50)
+    train_error = miniBatchLearning(images, labels, 300, testlearn, verbose=True, epochs=50)
     print('Time taken:', (time.perf_counter() - start_time))
     
     plt.plot(np.arange(len(train_error)), train_error)
     plt.figure()
     reset(nn.params)
-    train_error = miniBatchLearning(images, labels, -1, learn, verbose=True, epochs=50)
+    train_error = miniBatchLearning(images, labels, 300, learn, verbose=True, epochs=50)
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 
@@ -525,4 +567,4 @@ def ConvolutionDreamerTest():
     reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
 
 if __name__ == '__main__':
-    NNTester()
+    AETester()

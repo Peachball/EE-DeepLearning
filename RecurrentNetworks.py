@@ -2,6 +2,8 @@ import numpy as np
 import theano
 import theano.tensor as T
 from theano import config
+from DeepLearning import generateAdam
+import matplotlib.pyplot as plt
 
 class RecurrentLayer:
 
@@ -32,12 +34,10 @@ class LSTMLayer:
     '''
         This assumes that in this recurrent net, there is a corresponding output to each input
     '''
-    def __init__(self, in_size, out_size, cell_size=None, alpha=0.01, init_size=0.01,
-            out_type='sigmoid', in_var=None,
-            out_var=None, verbose=False):
+    def __init__(self, in_size, out_size, cell_size=None, init_size=0.01,
+            out_type='sigmoid', in_var=None, out_var=None, verbose=False):
         if cell_size == None:
             cell_size = max(in_size, out_size)
-        self.alpha = alpha
         self.in_size = in_size
         self.out_size = out_size
         self.cell_size = cell_size
@@ -139,14 +139,11 @@ class LSTMLayer:
 class LSTM():
 
     def __init__(self, *dim, **kwargs):
-        self.alpha = kwargs.get('alpha', 0.01)
-        self.momentum = kwargs.get('momentum', 0)
-        rprop = kwargs.get('rprop', False)
         out_type = kwargs.get('out_type', 'sigmoid')
         self.layers = []
         verbose = kwargs.get('verbose', False)
         init_size = kwargs.get('init_size', 0.01)
-        x = T.matrix('Input')
+        x = kwargs.get("in_var", T.matrix('Input'))
         y = T.matrix('Output')
         self.x = x
         self.y = y
@@ -171,6 +168,7 @@ class LSTM():
         #Define prediction:
         prediction = self.layers[-1].out
         self.predict = theano.function([x], prediction, updates=layerUpdates)
+        self.out = prediction
 
         if verbose:
             print('Defining error')
@@ -197,3 +195,32 @@ class LSTM():
         for l in self.layers:
             l.reset()
         return
+
+def LSTMTest():
+    x = np.linspace(0, 10, 100)
+    y = np.sin(x)
+    x = x.reshape(x.shape[0], 1)
+    y = y.reshape(y.shape[0], 1)
+    lstm = LSTM(1, 10, 1, verbose=True)
+    plt.plot(x, y)
+
+    target = T.matrix("target")
+    error = T.mean(T.sqr(lstm.out - target))
+
+    (adamstorage, adam) = generateAdam(lstm.params, error, alpha=0.01)
+
+    learn = theano.function([lstm.x, target], error, updates=adam)
+    
+    train_error = []
+    for i in range(100):
+        error = learn(x, y)
+        train_error.append(error)
+        print(error)
+
+    plt.plot(x, lstm.predict(x))
+    plt.figure()
+    plt.plot(np.arange(len(train_error)), train_error)
+    plt.show()
+
+if __name__ == "__main__":
+    LSTMTest()
