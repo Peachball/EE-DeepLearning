@@ -33,8 +33,6 @@ def testLSTM():
 
     x = data[:-1]
     y = data[1:]
-    savefile = open("lstm_test.pkl", "wb")
-    savefile.close()
     miniBatchLearning(x, y, -1, learnFunc, verbose=True, epochs=10)
     
 

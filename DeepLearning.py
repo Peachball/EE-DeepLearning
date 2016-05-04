@@ -121,7 +121,7 @@ class Layer:
 
 def reset(params, init_size=0.1):
     for p in params:
-        p.set_value(np.random.uniform(low=-init_size, high=init_size, size=p.get_value().shape))
+        p.set_value(np.random.uniform(low=-init_size, high=init_size, size=p.shape.eval()))
 
 def generateHessianUpdates(params, error, alpha, epsilon=1e-8):
     updates = []
@@ -508,7 +508,7 @@ def NNTester():
         reset(nn.params)
         learn = theano.function([nn.x, y], error, updates=u[0], allow_input_downcast=True)
         start_time = time.perf_counter()
-        train_error = miniBatchLearning(images, labels, 100, learn, verbose=False, epochs=10)
+        train_error = miniBatchLearning(images, labels, 500, learn, verbose=False, epochs=50)
         print(u[1], " took ", (time.perf_counter() - start_time))
         ax.plot(np.arange(len(train_error)), train_error, label=u[1])
 
