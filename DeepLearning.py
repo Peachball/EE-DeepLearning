@@ -473,8 +473,6 @@ def AETester():
 	learn = theano.function([ae.x, y], mse, updates=adam)
 	train_error = miniBatchLearning(images, images, 100, learn, verbose=True, epochs=10)
 
-#	pickle.dump(ae, open('autoencoder.pkl', 'wb'))
-
 	plt.plot(np.arange(len(train_error)), train_error)
 	plt.show()
 
@@ -581,4 +579,4 @@ def ConvolutionDreamerTest():
 	reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
 
 if __name__ == '__main__':
-	AETester()
+	NNTester()
