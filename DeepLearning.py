@@ -107,11 +107,11 @@ class Layer:
             x = in_var
 
         self.w = theano.shared(
-                value=(np.random.uniform(low=-init_size, high=init_size,
-                size=(in_size, out_size)).astype(theano.config.floatX) - 0.5) *
-                init_size)
-        self.b = theano.shared((np.random.rand(out_size).astype(theano.config.floatX) - 0.5) *
-                init_size)
+            value=(np.random.uniform(low=-init_size, high=init_size,
+            size=(in_size, out_size).astype(theano.config.floatX) - 0.5) *
+            init_size))
+        self.b = theano.shared(value=np.random.uniform(low=-init_size, high=init_size,
+            size=(out_size)).astype(theano.config.floatX))
         self.out = nonlinearity(T.dot(x, self.w) + self.b)
         self.params = [self.w, self.b]
 
@@ -144,7 +144,7 @@ def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
         shape = p.get_value().shape
         grad = T.grad(error, p)
 
-        totalG = theano.shared(value=np.zeros(shape)).astype(theano.config.floatX)
+        totalG = theano.shared(value=np.zeros(shape).astype(theano.config.floatX))
 
         new_g = totalG + T.sqr(grad)
         updates.append((totalG, new_g))
@@ -162,8 +162,8 @@ def generateAdadelta(params, error, decay=0.9, alpha=1, epsilon=1e-8):
         shape = p.get_value().shape
         grad = T.grad(error, p)
 
-        Eg = theano.shared(value=np.zeros(shape)).astype(theano.config.floatX)
-        Ex = theano.shared(value=np.zeros(shape)).astype(theano.config.floatX)
+        Eg = theano.shared(value=np.zeros(shape).astype(theano.config.floatX))
+        Ex = theano.shared(value=np.zeros(shape).astype(theano.config.floatX))
 
         new_g = decay * Eg + (1 - decay) * T.sqr(grad)
 
@@ -191,8 +191,8 @@ def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1
         shape = p.get_value().shape
         grad = T.grad(error, p)
 
-        m = theano.shared(value=np.zeros(shape), name="moment").astype(theano.config.floatX)
-        v = theano.shared(value=np.zeros(shape), name="moment 0").astype(theano.config.floatX)
+        m = theano.shared(value=np.zeros(shape).astype(theano.config.floatX))
+        v = theano.shared(value=np.zeros(shape).astype(theano.config.floatX))
 
         m_t = decay1 * m + (1 - decay1) * grad
         v_t = decay2 * v + (1 - decay2) * T.sqr(grad)
@@ -219,8 +219,8 @@ def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3):
         grad = T.grad(error, p)
 
         shape = p.get_value().shape
-        r_t = theano.shared(np.zeros(shape)).astype(theano.config.floatX)
-        v_t = theano.shared(np.zeros(shape)).astype(theano.config.floatX)
+        r_t = theano.shared(np.zeros(shape).astype(theano.config.floatX))
+        v_t = theano.shared(np.zeros(shape).astype(theano.config.floatX))
 
         new_r = (1 - decay) * T.sqr(grad) + decay * r_t
         new_v = alpha / (T.sqrt(new_r) + fudge) * grad
@@ -244,7 +244,7 @@ def generateMomentumUpdates(params, error, alpha=0.01, momentum=0.5):
     grad = []
     for p in params:
         grad.append(T.grad(error, p))
-    mparams = [theano.shared(np.zeros(p.get_value().shape)).astype(theano.config.floatX) for p in params]
+    mparams = [theano.shared(np.zeros(p.shape.eval()).astype(theano.config.floatX)) for p in params]
     gradUpdates = OrderedDict((p, p - g) for p, g in zip(params,mparams))
 
     gradUpdates.update(OrderedDict((m, momentum * m + alpha * g) for m, g in
@@ -258,8 +258,8 @@ def generateRpropUpdates(params, error, init_size=1, verbose=False):
     gradients = []
     #initalize stuff
     for p in params:
-        prevw.append(theano.shared(np.zeros(p.get_value().shape)).astype(config.floatX))
-        deltaw.append(theano.shared(init_size *  np.ones(p.get_value().shape)).astype(config.floatX))
+        prevw.append(theano.shared(np.zeros(p.shape.eval()).astype(config.floatX)))
+        deltaw.append(theano.shared(init_size * np.ones(p.shape.eval()).astype(config.floatX)))
 
     iterations = 0
     for p, dw, pw in zip(params, deltaw, prevw):
@@ -368,7 +368,7 @@ class ConvolutionLayer:
 
         #If bias needs to be applied to every hidden unit, it should be 3d
         bias = theano.shared(value=(np.random.rand(shape[1]) * 0.5 - 1) *
-                init_size).astype(theano.config.floatX)
+                init_size.astype(theano.config.floatX))
         if deconv:
             z = T.nnet.conv2d(x, filt, border_mode='full', subsample = (1,1))
         else:
