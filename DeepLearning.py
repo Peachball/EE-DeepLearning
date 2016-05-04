@@ -12,8 +12,6 @@ import time
 
 sys.setrecursionlimit(10000)
 
-theano.config.floatX = 'float64'
-
 def readMNISTData(length=10000):
     images = open('train-images-idx3-ubyte', 'rb')
     labels = open('train-labels-idx1-ubyte', 'rb')
@@ -97,8 +95,7 @@ class Layer:
             x = in_var
         
         if layer_type in ['sigmoid', 'tanh', 'linear']:
-            self.w = theano.shared((np.random.rand(in_size, out_size) - 0.5) *
-                    init_size).astype(theano.config.floatX)
+            self.w = theano.shared((np.random.uniform(low=-init_size, high=init_size, size=(in_size, out_size), dtype=theano.config.floatX)))
             self.b = theano.shared((np.random.rand(out_size) - 0.5) *
                     init_size).astype(theano.config.floatX)
             if layer_type == 'sigmoid':
@@ -116,8 +113,8 @@ class Layer:
 def generateVanillaUpdates(params, alpha, error):
     grad = []
     for p in params:
-        grad.append(T.grad(error, p))
-    updates = [(p, p - g) for p, g in zip(params, grad)]
+        grad.append(T.grad(error, p).astype(theano.config.floatX))
+    updates = OrderedDict((p, p - g) for p, g in zip(params, grad))
 
     return updates
 
@@ -306,8 +303,8 @@ def AETester():
         plt.show()
 
 def NNTester():
-    images, labels = readMNISTData(60000)
-    xcv, ycv = readcv(10000)
+    images, labels = readMNISTData(6000)
+    xcv, ycv = readcv(1000)
 
     y = T.matrix('Correct Labels')
     nn = FFClassifier(784, 1000, 10)
@@ -315,7 +312,7 @@ def NNTester():
 
     dupdates = generateVanillaUpdates(nn.params, 0.00001, error)
 
-    learn = theano.function([nn.x, y], error, updates=dupdates)
+    learn = theano.function([nn.x, y], error, updates=dupdates, allow_input_downcast=True)
     predict = theano.function([nn.x], nn.out)
 
     start_time = time.clock()
