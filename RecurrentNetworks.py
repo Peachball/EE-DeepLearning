@@ -262,13 +262,11 @@ def LSTMTest():
     x = x.reshape(x.shape[0], 1)
     y = y.reshape(y.shape[0], 1)
     lstm = LSTM(1, 10, 1, verbose=True)
-    fig, ax = plt.subplots()
+    sin_fig, ax = plt.subplots()
     ax.plot(x, y, label="Sine curve")
 
-    fig2 = plt.figure()
-    er_dat = fig2.add_axes([0,0,1,1])
-
-    print(er_dat)
+    er_fig = plt.figure()
+    er_dat = er_fig.add_subplot(111)
 
     target = T.matrix("target")
     error = T.mean(T.sqr(lstm.out - target))
@@ -284,8 +282,6 @@ def LSTMTest():
     updateRules = [(sgd, "SGD"), (adam, "Adam"), (rms, "RMS"), (adadelta, "Adadelta"),
             (adagrad, "Adagrad"), (rprop, "RProp")]
 
-    plt.savefig("??.png")
-
     def train(learn, epochs=100, verbose=False):
         train_error = []
         for i in range(epochs):
@@ -299,7 +295,7 @@ def LSTMTest():
         print("Compiling", u[1], "function")
         learn = theano.function([lstm.x, target], error, updates=u[0], allow_input_downcast=True)
         start_time = time.perf_counter()
-        train_error = train(learn, epochs=10, verbose=True)
+        train_error = train(learn, epochs=300, verbose=True)
         print("Time taken", u[1], (time.perf_counter() - start_time))
 
         er_dat.plot(np.arange(len(train_error)), train_error, label=u[1])
@@ -308,9 +304,11 @@ def LSTMTest():
     er_dat.set_yscale('log', nonposy='clip')
     er_dat.set_xlabel('Iterations')
     er_dat.set_ylabel('MSE')
+    er_dat.legend(loc='upper right')
+    sin_fig.legend(loc='upper right')
 
-    plt.savefig("rnn_error.png")
-
+    sin_fig.savefig("lstm_pred.png")
+    er_fig.savefig("lstm_err.png")
     plt.show()
 
 def RNNTest():
@@ -342,4 +340,4 @@ def RNNTest():
 
 
 if __name__ == "__main__":
-    RNNTest()
+    LSTMTest()
