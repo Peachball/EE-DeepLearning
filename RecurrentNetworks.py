@@ -196,6 +196,10 @@ class LSTMLayer:
         output = actualOutput.reshape((actualOutput.shape[0], actualOutput.shape[2]))
         self.out = output
 
+    def reset(self):
+        self.C.set_value(np.zeros(self.C.shape.eval()))
+        self.h.set_value(np.zeros(self.h.shape.eval()))
+
 class LSTM():
 
     def __init__(self, *dim, **kwargs):
@@ -278,6 +282,19 @@ class LSTM():
             p.set_value(params[n])
 
 
+def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
+        epochs=1, miniepochs=10):
+    train_error = []
+    if batchSize <= 0: batchSize = x.shape[0]
+    for j in range(epochs):
+        print(batchSize)
+        for batch in range(0, x.shape[0], batchSize):
+            train_error = train_error + miniBatchLearning(x[batch:batch+batchSize],
+                    y[batch:batch+batchSize], -1, learn, verbose=verbose, 
+                    epochs=miniepochs)
+        predict(x[batch:batchSize])
+    return train_error
+
 
 def LSTMTest():
     x = np.linspace(0, 10, 100)
@@ -285,9 +302,6 @@ def LSTMTest():
     x = x.reshape(x.shape[0], 1)
     y = y.reshape(y.shape[0], 1)
     lstm = LSTM(1, 10, 1, verbose=True)
-    lstm.load(open('test.npz', 'rb'))
-    print("loaded lstm")
-    lstm.save(open('test.npz', 'wb'))
     sin_fig, ax = plt.subplots()
     ax.plot(x, y, label="Sine curve")
 
@@ -321,7 +335,7 @@ def LSTMTest():
         print("Compiling", u[1], "function")
         learn = theano.function([lstm.x, target], error, updates=u[0], allow_input_downcast=True)
         start_time = time.perf_counter()
-        train_error = train(learn, epochs=300, verbose=True)
+        train_error = train(learn, epochs=500, verbose=True)
         print("Time taken", u[1], (time.perf_counter() - start_time))
 
         er_dat.plot(np.arange(len(train_error)), train_error, label=u[1])
@@ -330,8 +344,11 @@ def LSTMTest():
     er_dat.set_yscale('log', nonposy='clip')
     er_dat.set_xlabel('Iterations')
     er_dat.set_ylabel('MSE')
+    sin_fig.savefig("lstm_pred.png")
+    er_fig.savefig("lstm_err.png")
+
     er_dat.legend(loc='upper right')
-    sin_fig.legend(loc='upper right')
+    ax.legend(loc='upper right')
 
     sin_fig.savefig("lstm_pred.png")
     er_fig.savefig("lstm_err.png")
