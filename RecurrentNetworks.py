@@ -256,12 +256,38 @@ class LSTM():
             l.reset()
         return
 
+    def load_npz(self, npz):
+        j = {}
+        for i in npz:
+            j[int(i.replace('arr_', ''))] = npz[i]
+        return j
+
+    def get_numpy(self):
+        num = []
+        for p in self.params:
+            num.append(p.get_value())
+        return num
+
+    def save(self, f):
+        arr = self.get_numpy()
+        np.savez(f, *arr)
+
+    def load(self, f):
+        params = self.load_npz(np.load(f))
+        for p, n in zip(self.params, params):
+            p.set_value(params[n])
+
+
+
 def LSTMTest():
     x = np.linspace(0, 10, 100)
     y = np.sin(x)
     x = x.reshape(x.shape[0], 1)
     y = y.reshape(y.shape[0], 1)
     lstm = LSTM(1, 10, 1, verbose=True)
+    lstm.load(open('test.npz', 'rb'))
+    print("loaded lstm")
+    lstm.save(open('test.npz', 'wb'))
     sin_fig, ax = plt.subplots()
     ax.plot(x, y, label="Sine curve")
 
