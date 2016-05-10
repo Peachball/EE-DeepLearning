@@ -120,7 +120,8 @@ class Layer:
 
 def reset(params, init_size=0.1):
     for p in params:
-        p.set_value(np.random.uniform(low=-init_size, high=init_size, size=p.shape.eval()))
+        p.set_value(np.random.uniform(low=-init_size, high=init_size,
+            size=p.shape.eval()).astype(theano.config.floatX))
 
 def generateHessianUpdates(params, error, alpha, epsilon=1e-8):
     updates = []
@@ -582,4 +583,4 @@ def ConvolutionDreamerTest():
     reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
 
 if __name__ == '__main__':
-    AETester()
+    NNTester()
