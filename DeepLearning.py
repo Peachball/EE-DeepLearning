@@ -107,9 +107,8 @@ class Layer:
             x = in_var
 
         self.w = theano.shared(
-            value=(np.random.uniform(low=-init_size, high=init_size,
-            size=(in_size, out_size).astype(theano.config.floatX) - 0.5) *
-            init_size))
+            np.random.uniform(low=-init_size, high=init_size,
+            size=(in_size, out_size)).astype(theano.config.floatX))
         self.b = theano.shared(value=np.random.uniform(low=-init_size, high=init_size,
             size=(out_size)).astype(theano.config.floatX))
         self.out = nonlinearity(T.dot(x, self.w) + self.b)
@@ -282,7 +281,7 @@ def generateRpropUpdates(params, error, init_size=1, verbose=False):
         updates.append((pw, (T.sgn(gradients[-1]) * dw * (T.eq(diffW, 0)))))
 
     storage = prevw + deltaw
-    print("\nDone with updates")
+    if verbose: print("\nDone with updates")
 
     return (storage, updates)
 
@@ -455,9 +454,9 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
     return train_error
 
 def AETester():
-    images, labels = readMNISTData(6000)
+    images, labels = readMNISTData(300)
     xcv, ycv = readcv(100)
-    ae = AutoEncoder(784, 600, init_size=10)
+    ae = AutoEncoder(784, 784, init_size=1e-3)
 
 
 #    images = images / images.max()
@@ -471,9 +470,11 @@ def AETester():
     crossEntrop = -T.mean(yl * T.log(ae.out) + (1 - yl) * T.log(1 - ae.out))
 
     (adamStorage, adam) = generateAdam(ae.params, mse, alpha=1)
+    (rstorage, rprop) = generateRpropUpdates(ae.params, mse, init_size=0.1)
 
     learn = theano.function([ae.x, y], mse, updates=adam)
-    train_error = miniBatchLearning(images, images, 100, learn, verbose=True, epochs=10)
+    train_error = miniBatchLearning(images, images, 100, learn, verbose=True,
+            epochs=1000)
 
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
@@ -581,4 +582,4 @@ def ConvolutionDreamerTest():
     reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
 
 if __name__ == '__main__':
-    NNTester()
+    AETester()

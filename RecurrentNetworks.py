@@ -9,47 +9,52 @@ import time
 class RecurrentLayer:
 
     def __init__(self, in_size, out_size, in_var=T.matrix('input'),
-            init_size=0.01, verbose=False, hidden_size=None):
+            init_size=0.01, verbose=False, hidden_size=None,
+            nonlinearity=T.nnet.sigmoid):
         x = in_var
         self.x = x
         if hidden_size == None:
             hidden_size = max(in_size, out_size)
 
-        w_io = theano.shared(value=(np.random.rand(in_size, out_size) - 0.5) *
-                init_size).astype(theano.config.floatX)
-        b_io = theano.shared(value=(np.random.rand(out_size) - 0.5) *
-                init_size).astype(theano.config.floatX)
+        w_io = theano.shared(value=np.random.uniform(
+            low=-init_size, high=init_size, size=(in_size, out_size))
+            .astype(theano.config.floatX))
 
-        w_ih = theano.shared(value=(np.random.rand(in_size, hidden_size) -
-            0.5) * init_size).astype(theano.config.floatX)
-        b_ih = theano.shared(value=(np.random.rand(hidden_size) - 0.5) *
-                init_size).astype(theano.config.floatX)
+        w_ih = theano.shared(value=np.random.uniform(
+            low=-init_size, high=init_size, size=(in_size, hidden_size))
+            .astype(theano.config.floatX))
 
-        w_hh = theano.shared(value=np.random.uniform(low=-init_size, high=init_size,
-            size=(hidden_size, hidden_size)))
-        b_hh = theano.shared(value=np.random.uniform(low=-init_size, high=init_size,
-            size=(hidden_size)))
+        w_hh = theano.shared(value=np.random.uniform(
+            low=-init_size, high=init_size, size=(hidden_size, hidden_size))
+            .astype(theano.config.floatX))
+        b_h = theano.shared(value=np.random.uniform(
+            low=-init_size, high=init_size, size=(hidden_size))
+            .astype(theano.config.floatX))
 
         w_ho = theano.shared(value=np.random.uniform(low=-init_size, high=init_size,
-            size=(hidden_size, out_size)))
-        b_ho = theano.shared(value=np.random.uniform(low=-init_size, high=init_size,
-            size=(out_size)))
+            size=(hidden_size, out_size)).astype(theano.config.floatX))
+        b_o = theano.shared(value=np.random.uniform(
+            low=-init_size, high=init_size, size=(out_size))
+            .astype(theano.config.floatX))
+
         self.hidden = theano.shared(
-                value=np.zeros(hidden_size)).astype(theano.config.floatX)
+                value=np.zeros((hidden_size)).astype(theano.config.floatX))
 
         def recurrence(x, h_tm1):
-            h_t = T.dot(x, w_ih) + b_ih + T.dot(h_tm1, w_hh) + b_hh
-            out = T.dot(x, w_io) + b_io + T.dot(h_tm1, w_ho) + b_ho
+            h_t = T.nnet.sigmoid(T.dot(x, w_ih) + T.dot(h_tm1, w_hh) +
+                    b_h)
+            out = nonlinearity(T.dot(x, w_io) + T.dot(h_tm1, w_ho) +
+                    b_o)
             return [out, h_t]
 
         ([out, hidden], updates) = theano.scan(recurrence,
-                sequences=x, outputs_info=[None, T.matrix("hidden")], n_steps=x.shape[0])
+                sequences=x, outputs_info=[None, self.hidden], n_steps=x.shape[0])
 
         self.out = out
         self.updates = updates
         self.hidden = hidden[-1]
 
-        self.params = [w_ih, b_ih, w_hh, b_hh, w_io, b_io, w_ho, b_ho]
+        self.params = [w_ih, w_hh, b_h, w_io, w_ho, b_o]
 
 class RNN:
 
@@ -365,15 +370,18 @@ def RNNTest():
     mse = T.mean(T.sqr(out - y))
 
     params = l1.params + l2.params
-    (m, adadelta) = generateAdadelta(params, mse, alpha=1)
+    (m, adam) = generateAdam(params, mse, alpha=0.01)
+    (r, rprop) = generateRpropUpdates(params, mse, init_size=0.01)
 
-    learn = theano.function([x, y], mse, updates=adadelta)
+    learn = theano.function([x, y], mse, updates=rprop)
 
-    s_x = np.linspace(0, 10, 100)
+    print("Compiled Learn Function!")
+
+    s_x = np.linspace(0, 10, 100).reshape(100, 1)
     s_y = np.sin(s_x)
 
     train_error = []
-    for i in range(100):
+    for i in range(1000):
         error = learn(s_x, s_y)
         print(error)
         train_error.append(error)
@@ -383,4 +391,4 @@ def RNNTest():
 
 
 if __name__ == "__main__":
-    LSTMTest()
+    RNNTest()
