@@ -202,8 +202,10 @@ class LSTMLayer:
         self.out = output
 
     def reset(self):
-        self.C.set_value(np.zeros(self.C.shape.eval()))
-        self.h.set_value(np.zeros(self.h.shape.eval()))
+        self.C.set_value(np.zeros(self.C.shape.eval())
+                .astype(theano.config.floatX))
+        self.h.set_value(np.zeros(self.h.shape.eval())
+                .astype(theano.config.floatX))
 
 class LSTM():
 
@@ -254,11 +256,6 @@ class LSTM():
         self.params = []
         for i in self.layers:
             self.params = self.params + i.params
-
-
-    def resetGrad(self):
-        for sumGrad in self.summedGradients:
-            sumGrad.set_value(np.zeros(sumGrad.shape))
 
     def reset(self):
         for l in self.layers:
