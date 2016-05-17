@@ -41,6 +41,7 @@ def testLSTM():
     print("Done!")
     '''
     y = data[1:]
+    generateMusicFile(x[:1000], open('test.wav', 'wb'))
     print(x.shape)
 
     (rprop, rupdates) = generateRpropUpdates(lstm.params, lstm.error, 
@@ -50,8 +51,13 @@ def testLSTM():
 
     learnFunc = theano.function([lstm.x, lstm.y], lstm.error, updates=adam)
     lstm.reset()
+
+    train_error = miniBatchLearning(x[:1000], y[:1000], -1, learnFunc,
+            verbose=True, epochs=100)
+    '''
     train_error = miniRecurrentLearning(x, y, 10, learnFunc, lstm.predict, 
             verbose=True, miniepochs=10)
+    '''
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 

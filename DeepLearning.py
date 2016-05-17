@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import time
 
 sys.setrecursionlimit(10000)
+theano.config.floatX = 'float32'
 
 def readMNISTData(length=10000):
     images = open('train-images-idx3-ubyte', 'rb')
@@ -183,8 +184,9 @@ def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1
     updates = []
     moment = []
     vector = []
-    alpha = theano.shared(alpha)
-    time = theano.shared(value=1.0).astype(theano.config.floatX)
+    alpha = theano.shared(np.array(alpha).astype(theano.config.floatX))
+    time = theano.shared(np.array(1.0).astype(theano.config.floatX))
+    epsilon = theano.shared(np.array(epsilon).astype(theano.config.floatX))
     updates.append((time, time+1))
     i = 0
     for p in params:
@@ -214,7 +216,7 @@ def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3):
     v = []
     pr = []
     updates = []
-    alpha = theano.shared(alpha)
+    alpha = theano.shared(np.array(alpha).astype(theano.config.floatX))
     for p in params:
         grad = T.grad(error, p)
 
@@ -455,14 +457,15 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
     return train_error
 
 def AETester():
-    images, labels = readMNISTData(300)
+    images, labels = readMNISTData(1000)
     xcv, ycv = readcv(100)
-    ae = AutoEncoder(784, 784, init_size=1e-3)
+    ae = AutoEncoder(784, 784, init_size=0.1)
 
 
 #    images = images / images.max()
 
-    genImage = theano.function([ae.x], ae.reconstructed)
+    genImage = theano.function([ae.x], ae.reconstructed,
+            allow_input_downcast=True)
 
     y = T.matrix('correct output')
     yl = T.matrix('Correct labels')
@@ -470,11 +473,14 @@ def AETester():
 
     crossEntrop = -T.mean(yl * T.log(ae.out) + (1 - yl) * T.log(1 - ae.out))
 
-    (adamStorage, adam) = generateAdam(ae.params, mse, alpha=1)
+    (adamStorage, adam) = generateAdam(ae.params, mse, alpha=0.01)
+    (adaStorage, adaGrad) = generateAdagrad(ae.params, mse, alpha=1)
     (rstorage, rprop) = generateRpropUpdates(ae.params, mse, init_size=0.1)
+    (rmsstorage, rms) = generateRmsProp(ae.params, mse, alpha=0.01)
 
-    learn = theano.function([ae.x, y], mse, updates=adam)
-    train_error = miniBatchLearning(images, images, 100, learn, verbose=True,
+    learn = theano.function([ae.x, y], mse, updates=adam,
+            allow_input_downcast=True)
+    train_error = miniBatchLearning(images, images, 500, learn, verbose=True,
             epochs=1000)
 
     plt.plot(np.arange(len(train_error)), train_error)
@@ -583,4 +589,4 @@ def ConvolutionDreamerTest():
     reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
 
 if __name__ == '__main__':
-    NNTester()
+    AETester()
