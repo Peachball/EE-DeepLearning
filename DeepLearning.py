@@ -11,8 +11,6 @@ import struct
 import matplotlib.pyplot as plt
 import time
 
-sys.setrecursionlimit(10000)
-theano.config.floatX = 'float32'
 
 def readMNISTData(length=10000):
     images = open('train-images-idx3-ubyte', 'rb')
@@ -82,42 +80,6 @@ def readcv(length=10000):
     return (np.array(imgs), np.array(lbls))
 
 
-class Layer:
-    def __init__(self, in_size, out_size, layer_type='sigmoid', in_var=None,
-            init_size=0.1, nonlinearity=None):
-        self.in_size = in_size
-        self.out_size = out_size
-        self.nonlinearity = nonlinearity
-        if not layer_type in ['sigmoid', 'tanh', 'lstm', 'rnn', 'linear', 'rlu'] and nonlinearity==None:
-            raise Exception('Layer type is invalid: ' + str(layer_type))
-
-        if nonlinearity==None:
-            if layer_type == 'sigmoid':
-                nonlinearity = T.nnet.sigmoid
-            if layer_type == 'tanh':
-                nonlinearity = T.tanh
-            if layer_type == 'linear':
-                nonlinearity = lambda x: x
-            if layer_type == 'rlu':
-                nonlinearity = lambda x: T.log(1 + T.power(np.e, x))
-
-        if in_var==None:
-            x = T.matrix('Input')
-            print('hello')
-        else:
-            x = in_var
-
-        self.w = theano.shared(
-            np.random.uniform(low=-init_size, high=init_size,
-            size=(in_size, out_size)).astype(theano.config.floatX))
-        self.b = theano.shared(value=np.random.uniform(low=-init_size, high=init_size,
-            size=(out_size)).astype(theano.config.floatX))
-        self.out = nonlinearity(T.dot(x, self.w) + self.b)
-        self.params = [self.w, self.b]
-
-    def getOutput(self, x,  nonlinearity=T.nnet.sigmoid):
-        out = nonlinearity(T.dot(x, self.w) + self.b)
-        return out
 
 def reset(params, init_size=0.1):
     for p in params:
@@ -127,9 +89,9 @@ def reset(params, init_size=0.1):
 def generateHessianUpdates(params, error, alpha, epsilon=1e-8):
     updates = []
 
-    for p in params:
+    gradients = T.grad(error, params)
+    for p, grad in zip(params, gradients):
         shape = p.get_value().shape
-        grad = T.grad(error, p)
         flattenedP = T.flatten(p)
         hessian = theano.gradient.hessian(error, flattenedP).diagonal()
         hessian = hessian.reshape(shape)
@@ -137,13 +99,14 @@ def generateHessianUpdates(params, error, alpha, epsilon=1e-8):
         updates.append((p, p - grad / (hessian + epsilon) * alpha))
 
     return updates
+
 def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
     updates = []
     history = []
 
-    for p in params:
+    gradients = T.grad(error, params)
+    for p, grad in zip(params, gradients):
         shape = p.get_value().shape
-        grad = T.grad(error, p)
 
         totalG = theano.shared(value=np.zeros(shape).astype(theano.config.floatX))
 
@@ -159,9 +122,10 @@ def generateAdadelta(params, error, decay=0.9, alpha=1, epsilon=1e-8):
     updates = []
     accUpdates = []
     accGrad = []
-    for p in params:
+
+    gradients = T.grad(error, params)
+    for p, grad in zip(params, gradients):
         shape = p.get_value().shape
-        grad = T.grad(error, p)
 
         Eg = theano.shared(value=np.zeros(shape).astype(theano.config.floatX))
         Ex = theano.shared(value=np.zeros(shape).astype(theano.config.floatX))
@@ -189,7 +153,8 @@ def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1
     epsilon = theano.shared(np.array(epsilon).astype(theano.config.floatX))
     updates.append((time, time+1))
     i = 0
-    for p in params:
+    gradients = T.grad(error, params)
+    for p, grad in zip(params, gradients):
         shape = p.get_value().shape
         grad = T.grad(error, p)
 
@@ -288,6 +253,59 @@ def generateRpropUpdates(params, error, init_size=1, verbose=False):
 
     return (storage, updates)
 
+def getRegularization(params):
+    reg = T.sum(T.sqr(params[0]))
+    for p in params[1:]:
+        reg = reg + T.sum(T.sqr(p))
+    return reg
+
+
+class Layer:
+    def __init__(self, in_size, out_size, layer_type='sigmoid', in_var=None,
+            init_size=0.1, nonlinearity=None, weights=None):
+        self.in_size = in_size
+        self.out_size = out_size
+        self.nonlinearity = nonlinearity
+        if (
+                not layer_type in ['sigmoid', 'tanh', 'lstm', 'rnn', 'linear',
+                    'rlu', 'rigid_rlu'] 
+                and nonlinearity==None):
+            raise Exception('Layer type is invalid: ' + str(layer_type))
+
+        if nonlinearity==None:
+            if layer_type == 'sigmoid':
+                nonlinearity = T.nnet.sigmoid
+            if layer_type == 'tanh':
+                nonlinearity = T.tanh
+            if layer_type == 'linear':
+                nonlinearity = lambda x: x
+            if layer_type == 'rlu':
+                nonlinearity = lambda x: T.log(1 + T.power(np.e, x))
+            if layer_type =='rigid_rlu':
+                nonlinearity = lambda x: T.clip(x, 0, np.inf)
+
+        if in_var==None:
+            x = T.matrix('Input')
+            print('hello')
+        else:
+            x = in_var
+
+        if not weights:
+            self.w = theano.shared(
+                    np.random.uniform(low=-init_size, high=init_size,
+                    size=(in_size, out_size)).astype(theano.config.floatX))
+        else:
+            self.w = weights
+        self.b = theano.shared(value=np.random.uniform(low=-init_size, high=init_size,
+            size=(out_size)).astype(theano.config.floatX))
+        self.out = nonlinearity(T.dot(x, self.w) + self.b)
+        self.params = [self.w, self.b]
+
+    def getOutput(self, x,  nonlinearity=T.nnet.sigmoid):
+        out = nonlinearity(T.dot(x, self.w) + self.b)
+        return out
+
+
 class AutoEncoder:
     def __init__(self, *dim, **kwargs):
         momentum = kwargs.get('momentum', 0)
@@ -301,7 +319,9 @@ class AutoEncoder:
         self.x = kwargs.get('in_var', T.matrix('Generalized Input'))
         layers.append(Layer(dim[0], dim[1], in_var=self.x, init_size=init_size))
         for i in range(1, len(dim) - 1):
-            layers.append(Layer(dim[i], dim[i+1], in_var=layers[-1].out, init_size=init_size))
+            layers.append(Layer(dim[i], dim[i+1], 
+                in_var=layers[-1].out,
+                init_size=init_size))
 
         self.out = layers[-1].out
         decoder = []
@@ -310,8 +330,10 @@ class AutoEncoder:
             layer_type = 'sigmoid'
         else:
             layer_type = in_type
-        decoder.append(Layer(dim[-1], dim[-2], in_var=self.out, init_size=init_size,
-            layer_type=layer_type))
+        decoder.append(Layer(dim[-1], dim[-2],
+            in_var = self.out,
+            init_size = init_size,
+            layer_type = layer_type))
         for i in range(2, len(dim)):
             if i == len(dim) - 1:
                 layer_type = in_type
@@ -332,8 +354,7 @@ class AutoEncoder:
         for l in self.layers:
             self.params = self.params + l.params
 
-
-        print('Finished initialization')
+        if verbose: print("Finished Initialization")
 
     def learn(self,x, y, mode='vanilla', iterations=10):
         def getEncDecPair(layer):
@@ -356,21 +377,26 @@ class AutoEncoder:
                 pass
 
         #Warning: Not done at all
-
 class ConvolutionLayer:
     def __init__(self, shape, in_var=T.matrix('input'), nonlinearity=T.nnet.sigmoid, init_size=0.1,
-            deconv=False):
+            deconv=False, subsample=None):
         if nonlinearity == None:
             def na(x):
                 return x
             nonlinearty = na
+        if subsample == None:
+            subsample = (1, 1)
+        self.shape = shape
         x = in_var
         self.x = x
-        filt = theano.shared(value=(np.random.uniform(low=-1.0, high=1.0, size=shape) * init_size)).astype(theano.config.floatX)
+        filt = theano.shared(value=(
+            np.random.uniform(low=-init_size, high=init_size,
+                size=shape)).astype(theano.config.floatX))
 
         #If bias needs to be applied to every hidden unit, it should be 3d
-        bias = theano.shared(value=(np.random.rand(shape[1]) * 0.5 - 1) *
-                init_size.astype(theano.config.floatX))
+        bias = theano.shared(value=np.random.uniform(
+            low=-init_size, high=init_size, size=shape[1])
+            .astype(theano.config.floatX))
         if deconv:
             z = T.nnet.conv2d(x, filt, border_mode='full', subsample = (1,1))
         else:
@@ -456,32 +482,49 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
                 (i/x.shape[0])), 2)))
     return train_error
 
+def saveParams(params, f):
+    arr = self.get_numpy()
+    np.savez(f, *arr)
+
+def loadParams(params, f):
+    params = self.load_npz(np.load(f))
+    for p, n in zip(self.params, params):
+        p.set_value(params[n])
+
+def smartTrainer(x, y, batchSize, maxepochs=10, verbose=False, patience=2,
+        decrease_rate=0.95):
+    pass
+
 def AETester():
     images, labels = readMNISTData(1000)
     xcv, ycv = readcv(100)
-    ae = AutoEncoder(784, 784, init_size=0.1)
+    ae = AutoEncoder(784, 500, 300, init_size=0.1, in_type='sigmoid')
 
 
-#    images = images / images.max()
+    images = images / images.max()
 
     genImage = theano.function([ae.x], ae.reconstructed,
             allow_input_downcast=True)
 
     y = T.matrix('correct output')
     yl = T.matrix('Correct labels')
-    mse = T.mean(T.sqr(y - ae.reconstructed))
+    regError = getRegularization(ae.params)
+    mse = T.sqrt(T.mean(T.sqr(y - ae.reconstructed)))
+    normErr = mse
 
-    crossEntrop = -T.mean(yl * T.log(ae.out) + (1 - yl) * T.log(1 - ae.out))
+    crossEntrop = -T.mean(y * T.log(ae.reconstructed) +
+            (1 - y) * T.log(1 - ae.reconstructed))
 
-    (adamStorage, adam) = generateAdam(ae.params, mse, alpha=0.01)
-    (adaStorage, adaGrad) = generateAdagrad(ae.params, mse, alpha=1)
-    (rstorage, rprop) = generateRpropUpdates(ae.params, mse, init_size=0.1)
+    (adamStorage, adam) = generateAdam(ae.params, mse, alpha=0.001)
+    (adaStorage, adaGrad) = generateAdagrad(ae.params, mse, alpha=0.01)
+    (rstorage, rprop) = generateRpropUpdates(ae.params, mse,
+            init_size=0.01)
     (rmsstorage, rms) = generateRmsProp(ae.params, mse, alpha=0.01)
 
-    learn = theano.function([ae.x, y], mse, updates=adam,
+    learn = theano.function([ae.x, y], mse, updates=adaGrad,
             allow_input_downcast=True)
-    train_error = miniBatchLearning(images, images, 500, learn, verbose=True,
-            epochs=1000)
+    train_error = miniBatchLearning(images, images, 100, learn, verbose=True,
+            epochs=100)
 
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
@@ -588,5 +631,39 @@ def ConvolutionDreamerTest():
     reconstruct = theano.function([conv.x], conv.out)
     reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
 
+def eyeObserver():
+    from theano.tensor.signal import pool
+    im_width = 1080
+    im_height = 1920
+    x = T.tensor4()
+    y = T.matrix()
+
+    print("Building Convolution Layers")
+    conv1 = ConvolutionLayer((3, 1, 20, 20), in_var=x, init_size=0.1)
+    #Downsampling (Max pooling)
+    down1 = pool.pool_2d(conv1.out, (2, 2), ignore_border=False)
+
+    conv2 = ConvolutionLayer((1, 1, 20, 20), in_var=down1, init_size=0.1)
+    down2 = pool.pool_2d(conv2.out, (2, 2), ignore_border=False)
+
+
+    print("Finished Building Convoution Layers")
+    print("Creating neural network layers")
+
+    intermediate = T.flatten(down1, outdim=2)
+    test = theano.function([x], intermediate, mode='DebugMode')
+    print(test(np.random.rand(2, 3, im_width, im_height)).shape)
+    classifier1 = Layer(conv1.shape[1] * (im_width) *
+            (im_height* conv1.shape[3]), 1, in_var=intermediate)
+
+    print(classifier1.in_size)
+
+    prediction = classifier1.out
+
+    print("Compiling prediction function")
+    predict = theano.function([x], prediction)
+
+    error = -T.mean(y * T.log(prediction) + (1-y) * T.log(1-prediction))
+
 if __name__ == '__main__':
-    AETester()
+    eyeObserver()

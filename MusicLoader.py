@@ -3,10 +3,12 @@ import pickle
 import theano
 from DeepLearning import miniBatchLearning
 from DeepLearning import *
+from RBM import *
 from RecurrentNetworks import LSTM
 from RecurrentNetworks import miniRecurrentLearning
 import numpy as np
 import scipy.io.wavfile as wavUtil
+import matplotlib.pyplot as plt
 
 def convertMusicFile(index, inputsize=1000):
     filename = 'musicDataSet/' + str(index) + '.wav'
@@ -29,9 +31,13 @@ def generateMusicFile(arr, f):
     data = arr.flatten().reshape(arr.size/2, 2)
     wavUtil.write(f, 44100, data)
 
+def testPrediction(predict):
+    data = convertMusicFile(0)[:1000]
+    newSong = generateMusicFile(predict(data), open("test.wav", 'wb'))
+
 def testLSTM():
     data = convertMusicFile(0)
-    lstm = LSTM(1000, 1000, verbose=True, init_size=0.1, out_type='linear')
+    lstm = LSTM(1000, 1000, 1000, verbose=True, init_size=0.1, out_type='linear')
 
 
     x = data[:-1]
@@ -61,6 +67,53 @@ def testLSTM():
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 
+def testAutoEncoder():
+    data = convertMusicFile(0)
+    ae = AutoEncoder(1000, 1000, in_type='linear', init_size=0.01)
+
+    scaleFactor = data.max()
+    data = data / scaleFactor
+    y = T.matrix()
+    mse = T.mean(T.sqr((ae.reconstructed- y) * scaleFactor))
+
+    (rprop, rupdates) = generateRpropUpdates(ae.params, mse, init_size=0.01,
+            verbose=False)
+
+    (stor, adam) = generateAdam(ae.params, mse, alpha=0.001)
+    (stora, rms) = generateRmsProp(ae.params, mse, alpha=0.01)
+    (storag, momentum) = generateMomentumUpdates(ae.params, mse, alpha=1e-9,
+            momentum=0)
+
+    learn = theano.function([ae.x, y], mse, updates=rupdates)
+
+    train_error = miniBatchLearning(data[:1000], data[:1000], -1, learn, verbose=True,
+            epochs=1000)
+
+    plt.plot(np.arange(len(train_error)), train_error)
+    plt.yscale('log')
+    plt.show()
+    predict = theano.function([ae.x], ae.reconstructed * scaleFactor)
+    testPrediction(predict)
+
+def testRBM():
+    data = convertMusicFile(0)
+    rbm = RBMLayer(1000, 900, persistent_updatesize=500)
+    scaleFactor = data.max()
+    data = data / data.max()
+
+    y = T.matrix()
+
+    cdupdates = rbm.CDUpdates(rbm.in_var, alpha=0.0001)
+
+    mse = T.mean(T.sqr((rbm.out - y) * scaleFactor))
+
+    learn = theano.function([rbm.in_var, y], mse, updates=cdupdates)
+
+    train_error = rbm.miniBatch(learn, data, verbose=True, epochs=10)
+
+    plt.plot(np.arange(len(train_error)), train_error)
+    plt.show()
+
 
 if __name__ == '__main__':
-    testLSTM()
+    testAutoEncoder()
