@@ -668,6 +668,7 @@ def eyeObserver():
         class1.params + class2.params
 
     J = theano.function([x, y], error)
+
     print(J(np.random.rand(1, 3, im_width, im_height),
             np.asarray(1).reshape(1, 1)))
 
