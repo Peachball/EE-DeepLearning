@@ -395,12 +395,12 @@ class ConvolutionLayer:
 
         #If bias needs to be applied to every hidden unit, it should be 3d
         bias = theano.shared(value=np.random.uniform(
-            low=-init_size, high=init_size, size=shape[1])
+            low=-init_size, high=init_size, size=shape[0])
             .astype(theano.config.floatX))
         if deconv:
-            z = T.nnet.conv2d(x, filt, border_mode='full', subsample = (1,1))
+            z = T.nnet.conv2d(x, filt, border_mode='full', subsample=subsample)
         else:
-            z = T.nnet.conv2d(x, filt, border_mode='valid', subsample=(1,1))
+            z = T.nnet.conv2d(x, filt, border_mode='valid', subsample=subsample)
 
         self.out = nonlinearity(z + bias.dimshuffle('x', 0, 'x', 'x'))
         self.w = filt
@@ -635,35 +635,41 @@ def eyeObserver():
     from theano.tensor.signal import pool
     im_width = 1080
     im_height = 1920
-    x = T.tensor4()
-    y = T.matrix()
+    x = T.tensor4("Input")
+    y = T.matrix("Labels")
 
     print("Building Convolution Layers")
-    conv1 = ConvolutionLayer((3, 1, 20, 20), in_var=x, init_size=0.1)
-    #Downsampling (Max pooling)
-    down1 = pool.pool_2d(conv1.out, (2, 2), ignore_border=False)
-
-    conv2 = ConvolutionLayer((1, 1, 20, 20), in_var=down1, init_size=0.1)
-    down2 = pool.pool_2d(conv2.out, (2, 2), ignore_border=False)
-
+    conv1 = ConvolutionLayer((8, 3, 20, 20), in_var=x, init_size=0.1,
+            subsample=(4,4))
+    conv2 = ConvolutionLayer((6, 8, 15, 15), in_var=conv1.out, init_size=0.1,
+            subsample=(4,4))
+    conv3 = ConvolutionLayer((4, 6, 10, 10), in_var=conv2.out, init_size=0.1,
+            subsample=(4,4))
+    conv4 = ConvolutionLayer((2, 4, 5, 5), in_var=conv3.out, init_size=0.1,
+            subsample=(1,1))
 
     print("Finished Building Convoution Layers")
-    print("Creating neural network layers")
 
-    intermediate = T.flatten(down1, outdim=2)
-    test = theano.function([x], intermediate, mode='DebugMode')
-    print(test(np.random.rand(2, 3, im_width, im_height)).shape)
-    classifier1 = Layer(conv1.shape[1] * (im_width) *
-            (im_height* conv1.shape[3]), 1, in_var=intermediate)
+    intermediate = T.flatten(conv4.out, outdim=2)
 
-    print(classifier1.in_size)
+    test = theano.function([x], outputs=[intermediate])
 
-    prediction = classifier1.out
+    class1 = Layer(460, 200, in_var=intermediate, layer_type='rlu',
+            init_size=0.1)
+    class2 = Layer(200, 1, in_var=class1.out, layer_type='sigmoid',
+            init_size=0.1)
 
-    print("Compiling prediction function")
-    predict = theano.function([x], prediction)
+    output = class2.out
+    prediction = theano.function([x], output)
 
-    error = -T.mean(y * T.log(prediction) + (1-y) * T.log(1-prediction))
+    error = -T.mean(y * T.log(output) + (1-y) * T.log(1 - output))
+
+    params = conv1.params + conv2.params + conv3.params + conv4.params + \
+        class1.params + class2.params
+
+    J = theano.function([x, y], error)
+    print(J(np.random.rand(1, 3, im_width, im_height),
+            np.asarray(1).reshape(1, 1)))
 
 if __name__ == '__main__':
     eyeObserver()
