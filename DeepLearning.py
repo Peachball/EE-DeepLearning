@@ -631,46 +631,6 @@ def ConvolutionDreamerTest():
     reconstruct = theano.function([conv.x], conv.out)
     reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
 
-def eyeObserver():
-    from theano.tensor.signal import pool
-    im_width = 1080
-    im_height = 1920
-    x = T.tensor4("Input")
-    y = T.matrix("Labels")
-
-    print("Building Convolution Layers")
-    conv1 = ConvolutionLayer((8, 3, 20, 20), in_var=x, init_size=0.1,
-            subsample=(4,4))
-    conv2 = ConvolutionLayer((6, 8, 15, 15), in_var=conv1.out, init_size=0.1,
-            subsample=(4,4))
-    conv3 = ConvolutionLayer((4, 6, 10, 10), in_var=conv2.out, init_size=0.1,
-            subsample=(4,4))
-    conv4 = ConvolutionLayer((2, 4, 5, 5), in_var=conv3.out, init_size=0.1,
-            subsample=(1,1))
-
-    print("Finished Building Convoution Layers")
-
-    intermediate = T.flatten(conv4.out, outdim=2)
-
-    test = theano.function([x], outputs=[intermediate])
-
-    class1 = Layer(460, 200, in_var=intermediate, layer_type='rlu',
-            init_size=0.1)
-    class2 = Layer(200, 1, in_var=class1.out, layer_type='sigmoid',
-            init_size=0.1)
-
-    output = class2.out
-    prediction = theano.function([x], output)
-
-    error = -T.mean(y * T.log(output) + (1-y) * T.log(1 - output))
-
-    params = conv1.params + conv2.params + conv3.params + conv4.params + \
-        class1.params + class2.params
-
-    J = theano.function([x, y], error)
-
-    print(J(np.random.rand(1, 3, im_width, im_height),
-            np.asarray(1).reshape(1, 1)))
 
 if __name__ == '__main__':
-    eyeObserver()
+    AETester()
