@@ -10,7 +10,7 @@ class RecurrentLayer:
 
     def __init__(self, in_size, out_size, in_var=T.matrix('input'),
             init_size=0.01, verbose=False, hidden_size=None,
-            nonlinearity=T.nnet.sigmoid):
+            nonlinearity=T.nnet.sigmoid, h_nonlinearity=T.nnet.sigmoid):
         x = in_var
         self.x = x
         if hidden_size == None:
@@ -41,7 +41,7 @@ class RecurrentLayer:
                 value=np.zeros((hidden_size)).astype(theano.config.floatX))
 
         def recurrence(x, h_tm1):
-            h_t = T.nnet.sigmoid(T.dot(x, w_ih) + T.dot(h_tm1, w_hh) +
+            h_t =  h_nonlinearity(T.dot(x, w_ih) + T.dot(h_tm1, w_hh) +
                     b_h)
             out = nonlinearity(T.dot(x, w_io) + T.dot(h_tm1, w_ho) +
                     b_o)
@@ -78,7 +78,8 @@ class LSTMLayer:
         This assumes that in this recurrent net, there is a corresponding output to each input
     '''
     def __init__(self, in_size, out_size, cell_size=None, init_size=0.01,
-            out_type='sigmoid', in_var=None, out_var=None, verbose=False):
+            out_type='sigmoid', in_var=None, out_var=None, verbose=False,
+            large_bias=5):
         if cell_size == None:
             cell_size = max(in_size, out_size)
         self.in_size = in_size
@@ -98,8 +99,9 @@ class LSTMLayer:
                 value=np.random.uniform(low=-init_size, high=init_size,
                     size=(in_size, cell_size)).astype(theano.config.floatX))
         self.b_f= theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(1, cell_size)).astype(theano.config.floatX))
+                value=np.random.uniform(low=-init_size+large_bias,
+                    high=init_size+large_bias, size=(1, cell_size))
+                .astype(theano.config.floatX))
         self.W_cf = theano.shared(
                 value=np.random.uniform(low=-init_size, high=init_size,
                     size=(cell_size, cell_size)).astype(theano.config.floatX))
@@ -117,8 +119,9 @@ class LSTMLayer:
                 value=np.random.uniform(low=-init_size, high=init_size,
                     size=(in_size, cell_size)).astype(theano.config.floatX))
         self.b_m = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(1, cell_size)).astype(theano.config.floatX))
+                value=np.random.uniform(low=-init_size+large_bias,
+                    high=init_size+large_bias, size=(1, cell_size))
+                .astype(theano.config.floatX))
 
 #        memories = T.tanh(T.dot(self.h, self.W_hm) + T.dot(self.x, self.W_xm) + self.b_m)
         #Remember Gate
@@ -132,7 +135,8 @@ class LSTMLayer:
                 value=np.random.uniform(low=-init_size, high=init_size,
                     size=(cell_size, cell_size)).astype(theano.config.floatX))
         self.b_r = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
+                value=np.random.uniform(low=-init_size+large_bias,
+                    high=init_size+large_bias,
                     size=(1, cell_size)).astype(theano.config.floatX))
 
 #        remember = T.nnet.sigmoid(T.dot(self.h, self.W_hr) + T.dot(self.C, self.W_cr) + T.dot(self.x, self.W_xr) + self.b_r)
@@ -148,7 +152,8 @@ class LSTMLayer:
                 value=np.random.uniform(low=-init_size, high=init_size,
                     size=(in_size, out_size)).astype(theano.config.floatX))
         self.b_o = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
+                value=np.random.uniform(
+                    low=-init_size+large_bias, high=init_size+large_bias,
                     size=(1, out_size)).astype(theano.config.floatX))
 
         #Hidden
@@ -162,7 +167,8 @@ class LSTMLayer:
                 value=np.random.uniform(low=-init_size, high=init_size,
                     size=(in_size, out_size)).astype(theano.config.floatX))
         self.b_h = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
+                value=np.random.uniform(
+                    low=-init_size+large_bias, high=init_size+large_bias,
                     size=(1, out_size)).astype(theano.config.floatX))
 
         self.params = [self.W_xf, self.W_hf, self.W_cf, self.b_f, self.W_hm, self.W_xm, self.b_m,
@@ -388,4 +394,4 @@ def RNNTest():
 
 
 if __name__ == "__main__":
-    RNNTest()
+    LSTMTest()
