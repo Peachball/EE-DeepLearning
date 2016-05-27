@@ -80,25 +80,10 @@ def readcv(length=10000):
     return (np.array(imgs), np.array(lbls))
 
 
-
 def reset(params, init_size=0.1):
     for p in params:
         p.set_value(np.random.uniform(low=-init_size, high=init_size,
             size=p.shape.eval()).astype(theano.config.floatX))
-
-def generateHessianUpdates(params, error, alpha, epsilon=1e-8):
-    updates = []
-
-    gradients = T.grad(error, params)
-    for p, grad in zip(params, gradients):
-        shape = p.get_value().shape
-        flattenedP = T.flatten(p)
-        hessian = theano.gradient.hessian(error, flattenedP).diagonal()
-        hessian = hessian.reshape(shape)
-
-        updates.append((p, p - grad / (hessian + epsilon) * alpha))
-
-    return updates
 
 def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
     updates = []
@@ -197,8 +182,7 @@ def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3):
         r.append(r_t)
         v.append(v_t)
 
-    return [[r, v, alpha], updates]
-    #lmao not done here
+    return [[r, v, [alpha]], updates]
 
 def generateVanillaUpdates(params, error, alpha=0.01):
     grad = []
@@ -381,9 +365,7 @@ class ConvolutionLayer:
     def __init__(self, shape, in_var=T.matrix('input'), nonlinearity=T.nnet.sigmoid, init_size=0.1,
             deconv=False, subsample=None):
         if nonlinearity == None:
-            def na(x):
-                return x
-            nonlinearty = na
+            nonlinearity = lambda x: x
         if subsample == None:
             subsample = (1, 1)
         self.shape = shape
@@ -398,6 +380,7 @@ class ConvolutionLayer:
             low=-init_size, high=init_size, size=shape[0])
             .astype(theano.config.floatX))
         if deconv:
+            subsample = (1,1)
             z = T.nnet.conv2d(x, filt, border_mode='full', subsample=subsample)
         else:
             z = T.nnet.conv2d(x, filt, border_mode='valid', subsample=subsample)
@@ -416,11 +399,15 @@ class ConvolutionalAutoEncoder:
         x = T.tensor4('input')
         self.x = x
         init_size = kwargs.get('init_size', 0.1)
+        out_nonlinearity = kwargs.get('out_nonlinearity', None)
+        int_nonlinearity = kwargs.get('int_nonlinearity', T.nnet.sigmoid)
 
         encode = []
         encode.append(ConvolutionLayer(dim[0], in_var=x, init_size=init_size, deconv=False))
         for i in range(1, len(dim)):
-            encode.append(ConvolutionLayer(dim[i], in_var=layers[-1].out, init_size=init_size, deconv=False))
+            encode.append(ConvolutionLayer(dim[i], in_var=encode[-1].out,
+                init_size=init_size, deconv=False,
+                nonlinearity=int_nonlinearity))
 
         decoder = []
         self.out = encode[-1].out
@@ -430,17 +417,21 @@ class ConvolutionalAutoEncoder:
             d[0], d[1] = d[1], d[0]
             return tuple(d)
 
-        decoder.append(ConvolutionLayer(swapElements(dim[-1]), in_var=encode[-1].out, init_size=init_size,
-            deconv=True))
+        if len(encode) == 1:
+
+            decoder.append(ConvolutionLayer(swapElements(dim[-1]), in_var=encode[-1].out, init_size=init_size,
+                deconv=True, nonlinearity=out_nonlinearity))
+        else:
+            decoder.append(ConvolutionLayer(swapElements(dim[-1]), in_var=encode[-1].out, init_size=init_size,
+                deconv=True, nonlinearity=int_nonlinearity))
         #gotta implement the decoding step lol
         for i in range(2, len(dim)):
-            nonlinearity = T.nnet.sigmoid
+            nonlinearity = int_nonlinearity
             if i == len(dim) - 1:
                 nonlinearity = None
             decoder.append(ConvolutionLayer(swapElements(dim[-i]), in_var=decoder[-1].out, init_size=init_size,
-                deconv=True, nonlinearity=nonlinearity))
+                deconv=True, nonlinearity=out_nonlinearity))
 
-        print(decoder[-1].w.get_value().shape)
         self.reconstructed = decoder[-1].out
 
         layers = encode + decoder
@@ -483,13 +474,23 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
     return train_error
 
 def saveParams(params, f):
-    arr = self.get_numpy()
+    def get_numpy():
+        num = []
+        for p in params:
+            num.append(p.get_value())
+        return num
+    arr = get_numpy()
     np.savez(f, *arr)
 
 def loadParams(params, f):
-    params = self.load_npz(np.load(f))
-    for p, n in zip(self.params, params):
-        p.set_value(params[n])
+    def load_npz(npz):
+        j = {}
+        for i in npz:
+            j[int(i.replace('arr_', ''))] = npz[i]
+        return j
+    p = load_npz(np.load(f))
+    for par, n in zip(params, p):
+        par.set_value(p[n])
 
 def smartTrainer(x, y, batchSize, maxepochs=10, verbose=False, patience=2,
         decrease_rate=0.95):
@@ -573,11 +574,11 @@ def NNTester():
 
 
 def ConvolutionDreamerTest():
-    conv = ConvolutionalAutoEncoder((2, 3, 15, 15))
+    conv = ConvolutionalAutoEncoder((1, 3, 15, 15), init_size=0.1,
+            out_nonlinearity=T.nnet.sigmoid)
 
     i = 0
 
-    '''
     def googleImageDownloader(start=0):
         from apiclient.discovery import build
         nonlocal i
@@ -610,27 +611,43 @@ def ConvolutionDreamerTest():
                     downloadImage(item['link'], i)
                 except:
                     print('Failed to download:', item['title'])
-    '''
     from PIL import Image
-    def convertImageToArray(index):
+    def convertImageToArray(index, size=(100, 100)):
         filename = 'imageDataSet/' + str(index)
         im = Image.open(filename)
+        im.thumbnail(size, Image.ANTIALIAS)
         im.load()
         return np.asarray(im)
 
-    images = []
-    for i in range(1, 2):
-        try:
-            images.append(convertImageToArray(i)[:, :, :3])
-        except FileNotFoundError:
-            pass
 
-    plt.imshow(images[0])
-    print(images[0].shape)
+    curImage = convertImageToArray(3)
+    plt.imshow(curImage)
+    curImage = curImage.transpose(2, 0, 1)
     plt.show()
-    reconstruct = theano.function([conv.x], conv.out)
-    reconstruct(images[0].reshape(1, images[0].shape[-1], images[0].shape[0], images[0].shape[1]))
+    reconstruct = theano.function([conv.x], conv.reconstructed)
+    reconstructed = reconstruct(curImage[np.newaxis,:])
+
+
+    y = T.tensor4()
+    err = T.mean(T.sqr(conv.reconstructed - y))
+
+    (storage, rprop) = generateRpropUpdates(conv.params, err, init_size=0.0001)
+    (adamstorage, adam) = generateAdam(conv.params, err, alpha=0.001)
+    (stor, rms) = generateRmsProp(conv.params, err, alpha=0.001)
+
+    learn = theano.function([conv.x, y], err, updates=rms)
+
+    curImage = curImage / 255
+    train_error = miniBatchLearning(
+            curImage[np.newaxis,:], curImage[np.newaxis,:], -1, learn,
+            verbose=True, epochs=500)
+    plt.imshow(np.squeeze(reconstructed).transpose(1, 2, 0)*255)
+    outImage = np.squeeze(reconstructed).transpose(1, 2, 0)
+    print(outImage.max(), outImage.min())
+    plt.figure()
+    plt.plot(np.arange(len(train_error)), train_error)
+    plt.show()
 
 
 if __name__ == '__main__':
-    AETester()
+    ConvolutionDreamerTest()
