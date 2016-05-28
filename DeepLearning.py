@@ -80,9 +80,11 @@ def readcv(length=10000):
     return (np.array(imgs), np.array(lbls))
 
 
-def reset(params, init_size=0.1):
+def reset(params, init_size=0.1, init_range=None):
+    if init_range == None:
+        init_range = (-init_size, init_size)
     for p in params:
-        p.set_value(np.random.uniform(low=-init_size, high=init_size,
+        p.set_value(np.random.uniform(low=init_range[0], high=init_range[1],
             size=p.shape.eval()).astype(theano.config.floatX))
 
 def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
@@ -246,10 +248,12 @@ def getRegularization(params):
 
 class Layer:
     def __init__(self, in_size, out_size, layer_type='sigmoid', in_var=None,
-            init_size=0.1, nonlinearity=None, weights=None):
+            init_size=0.1, nonlinearity=None, weights=None, init_range=None):
         self.in_size = in_size
         self.out_size = out_size
         self.nonlinearity = nonlinearity
+        if init_range == None:
+            init_range = (-init_size, init_size)
         if (
                 not layer_type in ['sigmoid', 'tanh', 'lstm', 'rnn', 'linear',
                     'rlu', 'rigid_rlu'] 
@@ -276,11 +280,11 @@ class Layer:
 
         if not weights:
             self.w = theano.shared(
-                    np.random.uniform(low=-init_size, high=init_size,
+                    np.random.uniform(low=init_range[0], high=init_range[1],
                     size=(in_size, out_size)).astype(theano.config.floatX))
         else:
             self.w = weights
-        self.b = theano.shared(value=np.random.uniform(low=-init_size, high=init_size,
+        self.b = theano.shared(value=np.random.uniform(low=init_range[0], high=init_range[1],
             size=(out_size)).astype(theano.config.floatX))
         self.out = nonlinearity(T.dot(x, self.w) + self.b)
         self.params = [self.w, self.b]
@@ -363,21 +367,23 @@ class AutoEncoder:
         #Warning: Not done at all
 class ConvolutionLayer:
     def __init__(self, shape, in_var=T.matrix('input'), nonlinearity=T.nnet.sigmoid, init_size=0.1,
-            deconv=False, subsample=None):
+            deconv=False, subsample=None, init_range=None):
         if nonlinearity == None:
             nonlinearity = lambda x: x
         if subsample == None:
             subsample = (1, 1)
+        if init_range==None:
+            init_range=(-init_size, init_size)
         self.shape = shape
         x = in_var
         self.x = x
         filt = theano.shared(value=(
-            np.random.uniform(low=-init_size, high=init_size,
+            np.random.uniform(low=init_range[0], high=init_range[1],
                 size=shape)).astype(theano.config.floatX))
 
         #If bias needs to be applied to every hidden unit, it should be 3d
         bias = theano.shared(value=np.random.uniform(
-            low=-init_size, high=init_size, size=shape[0])
+            low=init_range[0], high=init_range[1], size=shape[0])
             .astype(theano.config.floatX))
         if deconv:
             subsample = (1,1)
@@ -401,6 +407,9 @@ class ConvolutionalAutoEncoder:
         init_size = kwargs.get('init_size', 0.1)
         out_nonlinearity = kwargs.get('out_nonlinearity', None)
         int_nonlinearity = kwargs.get('int_nonlinearity', T.nnet.sigmoid)
+        init_range = kwargs.get('init_range', None)
+        if init_range==None:
+            init_range = (-init_size, init_size)
 
         encode = []
         encode.append(ConvolutionLayer(dim[0], in_var=x, init_size=init_size, deconv=False))
@@ -435,6 +444,10 @@ class ConvolutionalAutoEncoder:
         self.reconstructed = decoder[-1].out
 
         layers = encode + decoder
+        self.layers = layers
+
+        self.encode = encode
+        self.decode = decoder
 
         self.params = []
         for l in layers:
@@ -572,10 +585,23 @@ def NNTester():
     plt.savefig("test.png")
     plt.show()
 
+def normalize(x, dim=-1, default=1):
+    maxes = np.max(x, axis=dim)
+    maxes[maxes==0] = default
+    means = np.mean(x, axis=dim)
+    maxes = np.expand_dims(maxes, axis=dim)
+    means = np.expand_dims(means, axis=dim)
+    return ((maxes, means), (x - means) / maxes)
+
+def scaleBack(x, scale):
+    maxes, means = scale
+    return (x*maxes) + means
 
 def ConvolutionDreamerTest():
-    conv = ConvolutionalAutoEncoder((1, 3, 15, 15), init_size=0.1,
-            out_nonlinearity=T.nnet.sigmoid)
+    conv = ConvolutionalAutoEncoder((3, 3, 15, 15), init_size=0.01,
+            out_nonlinearity=lambda x: T.maximum(0.01 * x, x),
+            int_nonlinearity=lambda x: T.maximum(0.01*x, x),
+            init_range=(0.5, 0.6))
 
     i = 0
 
@@ -620,33 +646,51 @@ def ConvolutionDreamerTest():
         return np.asarray(im)
 
 
-    curImage = convertImageToArray(3)
+    curImage = convertImageToArray(3, size=(20, 20))
     plt.imshow(curImage)
     curImage = curImage.transpose(2, 0, 1)
+    curImage = curImage[np.newaxis,:]
+    scale, curImage = normalize(curImage)
     plt.show()
     reconstruct = theano.function([conv.x], conv.reconstructed)
-    reconstructed = reconstruct(curImage[np.newaxis,:])
+    reconstructed = reconstruct(curImage)
 
 
     y = T.tensor4()
     err = T.mean(T.sqr(conv.reconstructed - y))
 
-    (storage, rprop) = generateRpropUpdates(conv.params, err, init_size=0.0001)
+    (storage, rprop) = generateRpropUpdates(conv.params, err, init_size=0.001)
     (adamstorage, adam) = generateAdam(conv.params, err, alpha=0.001)
     (stor, rms) = generateRmsProp(conv.params, err, alpha=0.001)
+    sgd = generateVanillaUpdates(conv.params, err, alpha=0.001)
 
-    learn = theano.function([conv.x, y], err, updates=rms)
+    learn = theano.function([conv.x, y], err, updates=sgd)
 
-    curImage = curImage / 255
+    info = storage + conv.params
+
+    try:
+        loadParams(info, 'convae.npz')
+    except Exception as e:
+        print(e)
+
+    curImage = curImage
     train_error = miniBatchLearning(
-            curImage[np.newaxis,:], curImage[np.newaxis,:], -1, learn,
-            verbose=True, epochs=500)
-    plt.imshow(np.squeeze(reconstructed).transpose(1, 2, 0)*255)
-    outImage = np.squeeze(reconstructed).transpose(1, 2, 0)
+            curImage, curImage, -1, learn,
+            verbose=True, epochs=1000)
+    plt.imshow(np.squeeze(reconstructed).transpose(1, 2, 0))
+    outImage = np.squeeze(scaleBack(reconstructed, scale)).transpose(1, 2, 0)
     print(outImage.max(), outImage.min())
+
+    plt.figure()
+    plt.imshow(conv.encode[0].w.get_value()[0,0,:,:], cmap='Greys')
+
+    plt.show()
     plt.figure()
     plt.plot(np.arange(len(train_error)), train_error)
+    plt.yscale('log')
     plt.show()
+
+#    saveParams(info, 'convae')
 
 
 if __name__ == '__main__':
