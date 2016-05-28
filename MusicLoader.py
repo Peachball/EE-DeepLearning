@@ -9,6 +9,7 @@ from RecurrentNetworks import miniRecurrentLearning
 import numpy as np
 import scipy.io.wavfile as wavUtil
 import matplotlib.pyplot as plt
+from RecurrentNetworks import *
 
 def convertMusicFile(index, inputsize=1000):
     filename = 'musicDataSet/' + str(index) + '.wav'
@@ -67,16 +68,15 @@ def testLSTM():
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 
-def testAutoEncoder():
-    data = convertMusicFile(0)
-    ae = AutoEncoder(1000, 1000, in_type='linear', init_size=0.01)
+def testRNN():
+    x = T.matrix('input')
+    y = T.matrix('output')
+    rnn = RecurrentLayer(1000, 1000, init_size=0.1, in_var=x, 
+            nonlinearity=lambda x: x)
 
-    scaleFactor = data.max()
-    data = data / scaleFactor
-    y = T.matrix()
-    mse = T.mean(T.sqr((ae.reconstructed- y) * scaleFactor))
+    data = convertMusicFile(0, inputsize=1000)
+    err = T.mean(T.sqr(rnn.out - y))
 
-    (rprop, rupdates) = generateRpropUpdates(ae.params, mse, init_size=0.01,
             verbose=False)
 
     (stor, adam) = generateAdam(ae.params, mse, alpha=0.001)
@@ -116,4 +116,4 @@ def testRBM():
 
 
 if __name__ == '__main__':
-    testAutoEncoder()
+    testRNN()

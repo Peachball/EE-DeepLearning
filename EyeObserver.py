@@ -2,11 +2,13 @@ from DeepLearning import *
 import random
 import cv2
 
-def readFile(f, see=True, start=0, limit=1e10):
+def readFile(f, see=True, start=0, limit=1e10, background=False):
     if see:
         org = './eyesDataSet/see/'
     else:
         org = './eyesDataSet/nosee/'
+    if background:
+        org = './eyesDataSet/noeye/'
 
     vidcap = cv2.VideoCapture(org + f)
     success, image = vidcap.read()
@@ -87,10 +89,21 @@ def eyeObserver():
     (storage, rprop) = generateRpropUpdates(params, error, init_size=0.01,
             verbose=True)
     sgd = generateVanillaUpdates(params, error, alpha=0.01)
+    (rmsStorage, rms) = generateRmsProp(params, error, alpha=0.003)
 
-    learn = theano.function([x, y], error, updates=sgd)
+    filestorage = params + [i for l in rmsStorage for i in l]
+    print("Compiling learn function")
+    learn = theano.function([x, y], error, updates=rprop)
+
+    try:
+        print("Loading previous paramaters")
+        loadParams(filestorage, "eyeTrack.conv.npz")
+    except Exception as e:
+        print("Unable to load previous paramaters")
 
     miniBatchLearning(images, labels, -1, learn, verbose=True, epochs=10)
+
+    saveParams(filestorage, "eyeTrack.conv")
 
 if __name__=='__main__':
     eyeObserver()
