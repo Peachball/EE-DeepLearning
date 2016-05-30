@@ -79,14 +79,16 @@ class LSTMLayer:
     '''
     def __init__(self, in_size, out_size, cell_size=None, init_size=0.01,
             out_type='sigmoid', in_var=None, out_var=None, verbose=False,
-            large_bias=5):
+            mem_bias=5):
         if cell_size == None:
             cell_size = max(in_size, out_size)
         self.in_size = in_size
         self.out_size = out_size
         self.cell_size = cell_size
         self.C = theano.shared(value=np.zeros((1, cell_size)), name='LongTerm')
-        self.h = theano.shared(value=np.zeros((1, out_size)), name='Previous Prediction')
+        self.h = theano.shared(value=np.zeros((1, out_size)), 
+                name='Previous Prediction')
+        large_bias = mem_bias
         if in_var == None:
             x = T.matrix(name='input example')
         else:
@@ -99,8 +101,8 @@ class LSTMLayer:
                 value=np.random.uniform(low=-init_size, high=init_size,
                     size=(in_size, cell_size)).astype(theano.config.floatX))
         self.b_f= theano.shared(
-                value=np.random.uniform(low=-init_size+large_bias,
-                    high=init_size+large_bias, size=(1, cell_size))
+                value=np.random.uniform(low=-init_size,
+                    high=init_size, size=(1, cell_size))
                 .astype(theano.config.floatX))
         self.W_cf = theano.shared(
                 value=np.random.uniform(low=-init_size, high=init_size,
@@ -153,7 +155,7 @@ class LSTMLayer:
                     size=(in_size, out_size)).astype(theano.config.floatX))
         self.b_o = theano.shared(
                 value=np.random.uniform(
-                    low=-init_size+large_bias, high=init_size+large_bias,
+                    low=-init_size, high=init_size,
                     size=(1, out_size)).astype(theano.config.floatX))
 
         #Hidden
@@ -178,13 +180,17 @@ class LSTMLayer:
             print('Weights have been initalized')
 
         def recurrence(x, h_tm1, c_tm1):
-            rem = T.nnet.sigmoid(T.dot( h_tm1, self.W_hr) + T.dot( c_tm1 , self.W_cr) + T.dot( x, self.W_xr) + self.b_r)
-            mem = T.tanh(T.dot( h_tm1, self.W_hm) + T.dot( x, self.W_xm) + self.b_m)
-            forget = T.nnet.sigmoid(T.dot( h_tm1, self.W_hf) + T.dot( c_tm1, self.W_cf) + T.dot( x, self.W_xf) + self.b_f)
+            rem = T.nnet.sigmoid(T.dot( h_tm1, self.W_hr) +
+                    T.dot( c_tm1 , self.W_cr) + T.dot( x, self.W_xr) + self.b_r)
+            mem = T.tanh(T.dot( h_tm1, self.W_hm) + T.dot( x, self.W_xm) +
+                    self.b_m)
+            forget = T.nnet.sigmoid(T.dot(h_tm1, self.W_hf) +
+                    T.dot(c_tm1, self.W_cf) + T.dot( x, self.W_xf) + self.b_f)
 
-            z = T.dot(c_tm1 , self.W_co) + T.dot( h_tm1 , self.W_ho) + T.dot(x, self.W_xo) + self.b_o
-            h_t = T.nnet.sigmoid(T.dot(c_tm1, self.W_ch) + T.dot(h_tm1, self.W_hh) + T.dot(x,
-                self.W_xh) + self.b_h)
+            z = T.dot(c_tm1 , self.W_co) + T.dot( h_tm1 , self.W_ho) + \
+                T.dot(x, self.W_xo) + self.b_o
+            h_t = T.nnet.sigmoid(T.dot(c_tm1, self.W_ch) +
+                    T.dot(h_tm1, self.W_hh) + T.dot(x, self.W_xh) + self.b_h)
             if out_type=='sigmoid':
                 out = T.nnet.sigmoid(z)
             elif out_type=='linear':

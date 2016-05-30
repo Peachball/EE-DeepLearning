@@ -9,12 +9,16 @@ from DeepLearning import readMNISTData, readcv
 class RBMLayer:
     def __init__(self, in_size, hidden_size, visible_type='det', hidden_type='det',
             distribution=T.nnet.sigmoid, init_size=0.1, in_var=T.matrix('input'),
-            persistent_updatesize=100):
+            persistent_updatesize=100, theano_rng=None):
         self.in_size = in_size
         self.hidden_size = hidden_size
         self.distribution = distribution
         self.in_var = in_var
 
+        if theano_rng == None:
+            theano_rng = T.shared_randomstreams.RandomStreams()
+
+        self.theano_rng = theano_rng
         self.b = theano.shared(value=np.random.uniform(low=-init_size,
             high=init_size, size=(in_size)).astype(theano.config.floatX),
             name='Visible Biases')
@@ -23,8 +27,8 @@ class RBMLayer:
             name='Hidden Biases')
 
         self.w = theano.shared(value=np.random.uniform(low=-init_size,
-            high=init_size, size=(in_size,
-                hidden_size)).astype(theano.config.floatX), name="RBM Weights")
+            high=init_size, size=(in_size, hidden_size))
+            .astype(theano.config.floatX), name="RBM Weights")
 
         hidden = distribution(T.dot(in_var, self.w) + self.c)
         self.out = distribution(T.dot(hidden, self.w.T) + self.b)
@@ -35,6 +39,32 @@ class RBMLayer:
                     size=(persistent_updatesize, in_size))
                 .astype(theano.config.floatX),
                 name='Persistent CD')
+
+    def getHidden(self, v):
+        h = T.dot(v, self.w) + self.c
+        h_sigmoid = T.nnet.sigmoid(h)
+        h_bin = self.theano_rng.binomial(size=h.shape, n=1, p=h_sigmoid)
+        return [h, h_sigmoid, h_bin]
+
+    def getVisible(self, h):
+        v = T.dot(h, self.w.T) + self.b
+        v_sigmoid = T.nnet.sigmoid(v)
+        v_bin = self.theano_rng.binomial(size=v.shape, n=1, p=v_sigmoid)
+        return [v, v_sigmoid, v_bin]
+
+    def sample_vhv(self, v):
+        [h, h_sig, h_bin] = self.getHidden(v)
+        [v1, v1_sig, v1_bin] = self.getVisible(h_bin)
+        return v1_bin
+
+    def free_energy(self, v):
+        bias = T.dot(v, self.b)
+
+        [_, hidden, _] = getHidden(v)
+        not_bias = T.sum(T.log(1 + T.exp(hidden)), axis=1)
+
+        return -bias - not_bias
+
 
     def CDUpdates(self, x, alpha):
         negativeSample = self.persistentCD

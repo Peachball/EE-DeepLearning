@@ -212,7 +212,8 @@ def generateRpropUpdates(params, error, init_size=1, verbose=False):
     #initalize stuff
     for p in params:
         prevw.append(theano.shared(np.zeros(p.shape.eval()).astype(config.floatX)))
-        deltaw.append(theano.shared(init_size * np.ones(p.shape.eval()).astype(config.floatX)))
+        deltaw.append(theano.shared(init_size * np.ones(p.shape.eval()).
+            astype(config.floatX)))
 
     iterations = 0
     for p, dw, pw in zip(params, deltaw, prevw):
@@ -268,7 +269,7 @@ class Layer:
             if layer_type == 'linear':
                 nonlinearity = lambda x: x
             if layer_type == 'rlu':
-                nonlinearity = lambda x: T.log(1 + T.power(np.e, x))
+                nonlinearity = lambda x: T.log(1 + T.exp(x))
             if layer_type =='rigid_rlu':
                 nonlinearity = lambda x: T.clip(x, 0, np.inf)
 
@@ -296,9 +297,6 @@ class Layer:
 
 class AutoEncoder:
     def __init__(self, *dim, **kwargs):
-        momentum = kwargs.get('momentum', 0)
-        alpha = kwargs.get('alpha', 0.01)
-        rprop = kwargs.get('rprop', False)
         init_size = kwargs.get('init_size', 1)
         verbose = kwargs.get('verbose', False)
         in_type = kwargs.get('in_type', 'linear')
@@ -551,6 +549,29 @@ def AETester():
         plt.imshow(images[i].reshape(28, 28), cmap='Greys', interpolation='none')
         plt.show()
 
+def simple_AETester():
+    ae = AutoEncoder(2, 2, in_type='linear', init_size=0.1)
+
+    data = np.array([[1, 0], [0, 1], [0, 0], [1, 1]])
+
+    predict = theano.function([ae.x], ae.reconstructed)
+
+    y = T.matrix('target')
+
+    error = T.mean(T.sqr(y - ae.reconstructed))
+
+    sgd = generateVanillaUpdates(ae.params, error, alpha=0.01)
+    (storage, rprop) = generateRpropUpdates(ae.params, error, init_size=1)
+
+    learn = theano.function([ae.x, y], error, updates=rprop)
+
+    miniBatchLearning(data, data, -1, learn, verbose=True, epochs=1000)
+
+    output = predict(data)
+    plt.scatter(data[:,0], data[:,1], color='green')
+    plt.scatter(output[:,0], output[:,1], color='red')
+    plt.show()
+
 def NNTester():
     images, labels = readMNISTData(6000)
     xcv, ycv = readcv(1000)
@@ -585,13 +606,15 @@ def NNTester():
     plt.savefig("test.png")
     plt.show()
 
-def normalize(x, dim=-1, default=1):
-    maxes = np.max(x, axis=dim)
-    maxes[maxes==0] = default
+def normalize(x, dim=0, default=1, mean=0):
     means = np.mean(x, axis=dim)
+
+    maxes = np.max(x - means, axis=dim)
+    maxes[maxes==0] = default
+
     maxes = np.expand_dims(maxes, axis=dim)
     means = np.expand_dims(means, axis=dim)
-    return ((maxes, means), (x - means) / maxes)
+    return ((maxes, means), (x - means + (mean * means)) / maxes)
 
 def scaleBack(x, scale):
     maxes, means = scale
@@ -607,7 +630,7 @@ def ConvolutionDreamerTest():
 
     def googleImageDownloader(start=0):
         from apiclient.discovery import build
-        nonlocal i
+        #nonlocal i
 
         service = build("customsearch", "v1",
                developerKey="AIzaSyBkd2lwAWzEKWjRbB2rlRM5OU_OBvz7u5w")
@@ -694,4 +717,4 @@ def ConvolutionDreamerTest():
 
 
 if __name__ == '__main__':
-    ConvolutionDreamerTest()
+    simple_AETester()

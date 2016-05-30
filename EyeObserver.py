@@ -1,6 +1,7 @@
 from DeepLearning import *
 import random
 import cv2
+import tensorflow as tf
 
 def readFile(f, see=True, start=0, limit=1e10, background=False):
     if see:

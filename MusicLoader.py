@@ -1,7 +1,5 @@
-from DeepLearning import generateRpropUpdates
 import pickle
 import theano
-from DeepLearning import miniBatchLearning
 from DeepLearning import *
 from RBM import *
 from RecurrentNetworks import LSTM
@@ -38,7 +36,7 @@ def testPrediction(predict):
 
 def testLSTM():
     data = convertMusicFile(0)
-    lstm = LSTM(1000, 1000, 1000, verbose=True, init_size=0.1, out_type='linear')
+    lstm = LSTM(1000, 1000, verbose=True, init_size=0.1, out_type='linear')
 
 
     x = data[:-1]
@@ -48,15 +46,14 @@ def testLSTM():
     print("Done!")
     '''
     y = data[1:]
-    generateMusicFile(x[:1000], open('test.wav', 'wb'))
     print(x.shape)
 
-    (rprop, rupdates) = generateRpropUpdates(lstm.params, lstm.error, 
+    (rprop, rupdates) = generateRpropUpdates(lstm.params, lstm.error,
             init_size=0.1, verbose=True)
     (adamstorage, adam) = generateAdam(lstm.params, lstm.error, alpha=1,
             verbose=True)
 
-    learnFunc = theano.function([lstm.x, lstm.y], lstm.error, updates=adam)
+    learnFunc = theano.function([lstm.x, lstm.y], lstm.error, updates=rupdates)
     lstm.reset()
 
     train_error = miniBatchLearning(x[:1000], y[:1000], -1, learnFunc,
@@ -65,7 +62,9 @@ def testLSTM():
     train_error = miniRecurrentLearning(x, y, 10, learnFunc, lstm.predict, 
             verbose=True, miniepochs=10)
     '''
+    generateMusicFile(x[:1000], open('test.wav', 'wb'))
     plt.plot(np.arange(len(train_error)), train_error)
+    plt.yscale('log')
     plt.show()
 
 def testRNN():
@@ -77,23 +76,38 @@ def testRNN():
     data = convertMusicFile(0, inputsize=1000)
     err = T.mean(T.sqr(rnn.out - y))
 
+def testAutoEncoder():
+    theano.config.floatX ='float32'
+    data = convertMusicFile(0)
+    ae = AutoEncoder(1000, 800, in_type='linear', init_size=0.1)
+
+    scaleFactor, data = normalize(data)
+    y = T.matrix()
+    mse = T.mean(T.sqr((ae.reconstructed- y)))
+
+    (rprop, rupdates) = generateRpropUpdates(ae.params, mse, init_size=0.1,
             verbose=False)
 
     (stor, adam) = generateAdam(ae.params, mse, alpha=0.001)
-    (stora, rms) = generateRmsProp(ae.params, mse, alpha=0.01)
-    (storag, momentum) = generateMomentumUpdates(ae.params, mse, alpha=1e-9,
-            momentum=0)
+    (stora, rms) = generateRmsProp(ae.params, mse, alpha=0.0001)
+    (storag, momentum) = generateMomentumUpdates(ae.params, mse, alpha=0.001,
+            momentum=0.9)
 
-    learn = theano.function([ae.x, y], mse, updates=rupdates)
+    sgd = generateVanillaUpdates(ae.params, mse, alpha=0.001)
 
-    train_error = miniBatchLearning(data[:1000], data[:1000], -1, learn, verbose=True,
-            epochs=1000)
+    learn = theano.function([ae.x, y], mse, updates=momentum,
+            allow_input_downcast=True)
+
+    train_error = miniBatchLearning(data[:1000], data[:1000], 250, learn, verbose=True,
+            epochs=2000)
 
     plt.plot(np.arange(len(train_error)), train_error)
     plt.yscale('log')
     plt.show()
-    predict = theano.function([ae.x], ae.reconstructed * scaleFactor)
-    testPrediction(predict)
+    predict = theano.function([ae.x], ae.reconstructed,
+            allow_input_downcast=True)
+    generateMusicFile(scaleBack(predict(data[:1000]), scaleFactor),
+        open("test.wav", "wb"))
 
 def testRBM():
     data = convertMusicFile(0)
