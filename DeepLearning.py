@@ -364,7 +364,8 @@ class AutoEncoder:
 
         #Warning: Not done at all
 class ConvolutionLayer:
-    def __init__(self, shape, in_var=T.matrix('input'), nonlinearity=T.nnet.sigmoid, init_size=0.1,
+    def __init__(self, shape, in_var=T.tensor4('input'),
+            nonlinearity=T.nnet.sigmoid, init_size=0.1,
             deconv=False, subsample=None, init_range=None):
         if nonlinearity == None:
             nonlinearity = lambda x: x
@@ -606,14 +607,17 @@ def NNTester():
     plt.savefig("test.png")
     plt.show()
 
-def normalize(x, dim=0, default=1, mean=0):
-    means = np.mean(x, axis=dim)
+def normalize(x, dim=0, default=1, mean=0, scaleFactor=None):
+    if scaleFactor == None:
+        means = np.mean(x, axis=dim)
 
-    maxes = np.max(x - means, axis=dim)
-    maxes[maxes==0] = default
+        maxes = np.max(x - means, axis=dim)
+        maxes[maxes==0] = default
 
-    maxes = np.expand_dims(maxes, axis=dim)
-    means = np.expand_dims(means, axis=dim)
+        maxes = np.expand_dims(maxes, axis=dim)
+        means = np.expand_dims(means, axis=dim)
+    else:
+        maxes, means = scaleFactor
     return ((maxes, means), (x - means + (mean * means)) / maxes)
 
 def scaleBack(x, scale):

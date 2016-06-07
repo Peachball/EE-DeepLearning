@@ -7,3 +7,5 @@ __pycache__/
 autoencoder.pkl
 *.pyc
 *DataSet/*
+*.pdf
+*.wav

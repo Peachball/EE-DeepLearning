@@ -6,8 +6,111 @@
 \maketitle
 
 \section{Introduction}
+As technology develops, more and more computationally expensive tasks can be
+utilized. One growing field exemplifying this is the category of deep learning
+algorithms, that can model very complex data.  Recurrent networks specialize in
+this task, being able to model time series, such as speech. This paper will
+discuss the effectiveness of using different types of deep learning algorithms
+to model another type of time series, music. The model will then be utilized to
+generate music, to see how well it is able to model music based on other samples
+of music.
+
+\section{Models}
+The models that will be used are recurrent neural networks, and other methods
+such as restricted boltzmann machines and autoencoders to reduce the
+dimensionality of the data before feeding the data into the neural network.
+
+
+\subsection{Vanilla Recurrent Neural Networks}
+Vanilla recurrent networks are neural networks with a connection that goes
+through time. The activation of each hidden node can be considered as 
+$$a_t = W\cdot a_{t-1} + W\cdot I_t + b_a$$
+where $a_t$ is the activation at time t, W is the corresponding weight matrix,
+$a_{t-1}$ is the activation of the node at one step before the time, and $I_t$
+is the input at that time. The activation typically goes through a nonlinearity,
+such as a sigmoid function before being passed to the next node. These models
+theoretically can model time series, but in practice they do not have much
+memory. As the length of the time series increases, these models become prone to
+``forgetting'' earlier samples in the input data. Thus, other more complicated
+models should probably be used for time series analysis.
+
+\subsection{Long Short Term Memory Networks}
+A model that attempts to overcome the short term memory of vanilla neural
+networks is the long short term memory network. These networks, through using
+cells and vectors that can be modified by the network, can store long term
+information. They do this through generating ``memories'', through the function:
+
+$$M = \tanh(W\cdot C + W\cdot I_t + b_M)$$
+
+where C denotes the cell state of the network. For more information, refer to
+Horchreiter's original paper~\cite{lstm}.
+
+\subsection{Restricted Boltzmann Machines}
+The restricted boltzmann machine is an unsupervised learning algorithm that
+attempts to determine the distribution of a sample of input using an energy
+based model. They do this through assigning every possible input a corresponding
+energy, and free energy, and then minimize the energy of the input, while also
+increasing the energy of samples that are not the input through generating
+random samples.
+
+\subsection{Convolution Neural Network}
+Convolutional networks are simply an element of a neural network, in which a
+filter is applied to all the elements in the input, in some pattern. Convolution
+neural networks are typically used for computer vision technologies, as elements
+in an image are generally more related to each other if they are closer to each
+other. However, as the music files will be converted to an array of air
+pressures, the frequency of the various tones are not known. Thus, convolutional
+networks could be used to find patterns within the frequency, as music does have
+patterns within sounds that are next to each other.
+
+\subsection{Autoencoder}
+Autoencoders are a form a unsupervised learning algorithm, as they simply find a
+relationship within the data. They are useful as they can reduce the
+dimensionality of the data, making the computations faster for the recurrent
+neural network. An autoencoder is a two layer neural network, with the input
+layer and desired output both being a sample from the input data.
+
+\subsection{Rprop Trainer}
 
 
 \section{Data}
+
+\section{Appendix}
+\subsection{Code Used}
+
+\begin{thebibliography}{9}
+	\bibitem{deepnetworktrainers}
+		Larochelle, Hugo et al. ``Exploring Strategies for Training Deep Neural
+		Networks.'' \textit{Journal of Machine Learning Research} (2009): n\. pag.
+		Web. 10 May 2016.
+
+	\bibitem{dnn dimensionality}
+		Hinton, G.E. and Salakhutdinov, R. R. ``Reducing the Dimensionality of
+		Data with Neural Networks.'' \textit{Science} (2006). 504--507. Web. 10
+		May 2016
+
+	\bibitem{unsupervised}
+		Erhan, Dumitru et al. ``Why Does Unsupervised Pre-training Help Deep
+		Learning?'' \textit{University of Montreal}:201--208. Web. 10 May 2016.
+
+	\bibitem{rbm}
+		Hinton, Geoffrey. ``A Practical Guide to Training Restricted Boltzmann
+		Machines.'' \textit{University of Toronto (2010)}: 1--20. Web. 10 May
+		2016.
+
+	\bibitem{rbm intro}
+		Fischer, Asja and Igel, Christian. ``An Introduction to Restricted
+		Boltzmann Machines. \textit{University of Copenhagen (2012)}: 14--36. Web.
+		10 May 2016.
+
+	\bibitem{lstm}
+		Horchreiter, Sepp and Schmidhuber, Jurgen. ``Long Short-Term Memory.''
+		\textit{Technical University of Munich (1997)}: 1--32. Web. 10 May 2016.
+
+	\bibitem{cw-rnn}
+		Koutnik, Jan et al. ``A Clockwork RNN.'' \textit{Dalle Molle Institute
+		for Artificial Intelligence Research}: n\. pag. Web. 25 May 2016.
+
+\end{thebibliography}
 
 \end{document}

@@ -95,11 +95,11 @@ def testAutoEncoder():
 
     sgd = generateVanillaUpdates(ae.params, mse, alpha=0.001)
 
-    learn = theano.function([ae.x, y], mse, updates=momentum,
+    learn = theano.function([ae.x, y], mse, updates=rupdates,
             allow_input_downcast=True)
 
-    train_error = miniBatchLearning(data[:1000], data[:1000], 250, learn, verbose=True,
-            epochs=2000)
+    train_error = miniBatchLearning(data[:1000], data[:1000], -1, learn, verbose=True,
+            epochs=1000)
 
     plt.plot(np.arange(len(train_error)), train_error)
     plt.yscale('log')
@@ -128,6 +128,39 @@ def testRBM():
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 
+def testConvNet():
+    data = convertMusicFile(0)
+    x = data[:1000].reshape(1000, 1, 1, 1000)
+
+    scaleFactor, x = normalize(x)
+    print(x.shape, data[:1000].shape)
+
+    conv1 = ConvolutionLayer((1, 1, 1, 10), init_size=0.1,
+            nonlinearity = lambda x: x)
+    conv2 = ConvolutionLayer((1, 1, 1, 10), in_var = conv1.out,
+                nonlinearity = lambda x: x, init_size=0.1, deconv=True)
+
+    out = conv2.out
+    y = T.tensor4('target')
+    params = conv1.params + conv2.params
+    error = T.mean(T.sqr(y - out))
+    predict = theano.function([conv1.x], conv2.out)
+
+    (storage, rprop) = generateRpropUpdates(params, error, init_size=0.01)
+
+    learn = theano.function([conv1.x, y], error, updates=rprop)
+
+    train_error = miniBatchLearning(x, x, -1, learn, verbose=True, epochs=10)
+
+    plt.plot(np.arange(len(train_error)), train_error)
+    plt.yscale('log')
+    plt.show()
+
+    finalP = predict(x)
+    print(finalP.min(), finalP.max())
+    print(x.min(), x.max())
+
+
 
 if __name__ == '__main__':
-    testRNN()
+    testConvNet()
