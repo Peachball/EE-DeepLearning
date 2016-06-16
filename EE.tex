@@ -4,7 +4,9 @@
 \usepackage{caption}
 \usepackage{graphicx}
 \usepackage{listings}
+\usepackage{geometry}
 
+\geometry{margin=1in}
 \graphicspath{{EEimages/}}
 
 \begin{document}
@@ -20,7 +22,9 @@ this task, being able to model time series, such as speech. This paper will
 discuss the effectiveness of using different types of deep learning algorithms
 to model another type of time series, music. The model will then be utilized to
 generate music, to see how well it is able to model music based on other samples
-of music.
+of music. The model will also be trained using unsupervised learning techniques,
+to see the relative abilities of each model to remember sequences, or compress
+the music.
 
 \section{Models}
 The models that will be used are recurrent neural networks, and other methods
@@ -57,6 +61,12 @@ or too large, resulting in inefficient training. This problem will be addressed
 through using gradient descent algorithms that are not reliant on the magnitude
 of the gradient.
 
+Deep learning algorithms however, are capable of much more complex tasks than
+neural networks, due to their increased size. Some applications of these deep
+networks is SyntaxNet, an algorithm that can correctly determine the grammatical
+structure of a sentence, such as determining what the direct object of a
+sentence is.
+
 
 \subsection{Vanilla Recurrent Neural Networks}
 Recurrent networks are neural networks that can model time series data. This is
@@ -88,6 +98,17 @@ significantly more computationally expensive, due to the significantly increased
 complexity of the model. As a result, tasks such as computing the gradient, the
 error, or predicting something with these models takes more time than a
 traditional recurrent neural network.
+
+\subsection{Clockwork Recurrent Neural Network}
+Another attempt to increase the memory of a vanilla recurrent neural network, is
+the clockwork recurrent neural network. These networks are identical to vanilla
+networks, except their hidden layer is partitioned. Each partition of hidden
+units is calculated for only some of the input, and thus is not updated at every
+time step. As a result, the partitions that are updated less often serve the
+purpose of being the memory for the network, and enable the model to
+``remember'' better than normal recurrent networks. Also, these networks are
+less computationally expensive than long short term memory networks, resulting
+in faster compile and training times.
 
 \subsection{Restricted Boltzmann Machines}
 The restricted Boltzmann machine is an unsupervised learning algorithm that
@@ -151,9 +172,9 @@ parameters. The reason this method will be used, is because this algorithm is
 not affected by the vanishing gradient problem, or the exploding gradient
 problem, as the algorithm only worries about the sign of the gradient, being
 positive or negative. Furthermore, the algorithm approaches the minimum for the
-error function exponentially, as it will increase the magnitutde of the update
+error function exponentially, as it will increase the magnitude of the update
 if the previous update was in the same direction as the current update. For
-example, if the first update added 1 to a paramater, and the second gradient was
+example, if the first update added 1 to a parameter, and the second gradient was
 also positive, the second update would add 1 multiplied with some constant,
 being 1.2 in this case. As a result, the updates can potentially increase
 exponentially, and will find the gradient with less iterations. However, this
@@ -168,6 +189,19 @@ samples is known as back propagation through time, as to find the gradient, one
 needs to back propagate through the previous data samples. Thus, if the data
 sequence passed to a recurrent neural network is too long, then training the
 model will take a large amount of time.
+
+A modification to this algorithm can be made, to speed up the training, through
+learning parts of the data sequence at a time. Essentially, mini batch learning
+can be applied, except when switching to another data sample, the value for the
+hidden units or memory of the network is generated before training the network
+on the other batch of data.
+
+\subsection{Real Time Recurrent Learning}
+Although back propagation through time is simple to implement, it is
+expensive to calculate, as it requires a complete sequence of data. However,
+another derivation of the derivative of the cost function gives real time
+recurrent learning, which is only dependent on some stored variables, and one
+data sample.
 
 \subsection{Implementational Details}
 Python and Theano are used to test these models. Theano is considered to be very
