@@ -222,6 +222,22 @@ class LSTMLayer:
 class LSTM():
 
     def __init__(self, *dim, **kwargs):
+        """
+        Initialize a multi layer lstm only classifier
+
+        args:
+            dim - (tuple of ints)
+                Layer sizes of model (parallels neural network)
+            out_type - string
+                Nonlinearity that the lstm will apply on output units
+            verbose - bool
+                If true, output information about the construction of model
+            init_size - float(0, inf)
+                Define the range of values that the paramaters of the model can
+                have
+            in_var - theano.tensor.matrix()
+                Define the input (from perhaps another model)
+        """
         out_type = kwargs.get('out_type', 'sigmoid')
         self.layers = []
         verbose = kwargs.get('verbose', False)
@@ -298,6 +314,31 @@ class LSTM():
 
 def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
         epochs=1, miniepochs=10):
+    """
+    Train model on parts of a time series at a time
+    e.g. given time seires : 1, 2, 3, 4, 5, 6
+        Train 1 and 2, then 2 and 3, etc
+
+    Variable intepretations:
+        x - numpy array : each row is a data sample
+                          each column is a feature
+        y - numpy array : same as x, but for labels
+
+        batchSize - int(0, inf) : size of the time series segment
+                                  The example would have a batchSize of 2
+
+        learn - void func(data, labels) : function that trains the model
+        predict - labels func(data) : function that updates the internal state of
+                                  the model
+        verbose - boolean : display train error to stdout or not
+        epochs - int(0, inf) : number of times to iterate through train data
+        miniepochs - int(0, inf) : number of times to train one time series
+                                   segment
+                                   In the example, that would be the number of
+                                   times to train on "1 and 2", then "2 and 3",
+                                   etc.
+    """
+
     train_error = []
     if batchSize <= 0: batchSize = x.shape[0]
     for j in range(epochs):

@@ -9,3 +9,5 @@ autoencoder.pkl
 *DataSet/*
 *.pdf
 *.wav
+.vimrc
+tags

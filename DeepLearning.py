@@ -721,4 +721,4 @@ def ConvolutionDreamerTest():
 
 
 if __name__ == '__main__':
-    simple_AETester()
+    ConvolutionDreamerTest()
