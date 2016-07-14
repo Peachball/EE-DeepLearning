@@ -85,9 +85,10 @@ class LSTMLayer:
         self.in_size = in_size
         self.out_size = out_size
         self.cell_size = cell_size
-        self.C = theano.shared(value=np.zeros((1, cell_size)), name='LongTerm')
-        self.h = theano.shared(value=np.zeros((1, out_size)), 
-                name='Previous Prediction')
+        self.C = theano.shared(value=np.zeros((1, cell_size))
+                .astype(theano.config.floatX), name='LongTerm')
+        self.h = theano.shared(value=np.zeros((1, out_size))
+                .astype(theano.config.floatX), name='Previous Prediction')
         large_bias = mem_bias
         if in_var == None:
             x = T.matrix(name='input example')
@@ -266,11 +267,13 @@ class LSTM():
 
         #Define prediction:
         prediction = self.layers[-1].out
-        self.predict = theano.function([x], prediction, updates=layerUpdates)
+        self.predict = theano.function([x], prediction, updates=layerUpdates
+                ,allow_input_downcast=True)
         self.out = prediction
 
         if verbose:
             print('Defining error')
+
         #Define Error
         if out_type=='sigmoid':
             self.error = -T.mean((y)*T.log(T.clip(prediction, 1e-9, 1-1e-9)) +
@@ -313,7 +316,7 @@ class LSTM():
 
 
 def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
-        epochs=1, miniepochs=10):
+        epochs=1, miniepochs=10, save=None, saveiters=None):
     """
     Train model on parts of a time series at a time
     e.g. given time seires : 1, 2, 3, 4, 5, 6
@@ -341,13 +344,20 @@ def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
 
     train_error = []
     if batchSize <= 0: batchSize = x.shape[0]
+    iterations = 0
     for j in range(epochs):
         print(batchSize)
-        for batch in range(0, x.shape[0], batchSize):
+        for batch in range(0, x.shape[0]):
             train_error = train_error + miniBatchLearning(x[batch:batch+batchSize],
-                    y[batch:batch+batchSize], -1, learn, verbose=verbose, 
+                    y[batch:batch+batchSize], -1, learn, verbose=False,
                     epochs=miniepochs)
-        predict(x[batch:batchSize])
+            iterations += 1
+            if verbose: print("Epoch: ", "%.4f" % ((j+1) + batch/x.shape[0]),
+                    "Error: ", (train_error[-1]))
+            if save and saveiters:
+                if iterations % saveiters == 0:
+                    save()
+        predict(x[batch])
     return train_error
 
 

@@ -131,7 +131,13 @@ def generateAdadelta(params, error, decay=0.9, alpha=1, epsilon=1e-8):
 
     return ([accUpdates, accGrad], updates)
 
-def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1e-8, verbose=False):
+def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999,
+        epsilon=1e-8, verbose=False):
+    """
+        Generate updates for the adam type of stochastic gradient descent
+
+            Variable interp.
+    """
     updates = []
     moment = []
     vector = []
@@ -141,6 +147,8 @@ def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1
     updates.append((time, time+1))
     i = 0
     gradients = T.grad(error, params)
+    decay1 = theano.shared(np.array(decay1).astype(theano.config.floatX))
+    decay2 = theano.shared(np.array(decay2).astype(theano.config.floatX))
     for p, grad in zip(params, gradients):
         shape = p.get_value().shape
         grad = T.grad(error, p)
@@ -152,16 +160,18 @@ def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999, epsilon=1
         v_t = decay2 * v + (1 - decay2) * T.sqr(grad)
         m_adj = m_t / (1.0 - T.pow(decay1, time))
         v_adj = v_t / (1.0 - T.pow(decay2, time))
+
         updates.append((m, m_t))
         updates.append((v, v_t))
-        updates.append((p, p - alpha * m_adj / (T.sqrt(v_adj) + epsilon)))
+        # updates.append((p, p - alpha * m_adj / (T.sqrt(v_adj) + epsilon)))
 
         moment.append(m)
         vector.append(v)
         if verbose: print("\rDone with {}/{}".format(i+1, len(params)), end="")
         i += 1
 
-    return ([moment, vector, time, alpha], updates)
+    print("")
+    return (moment + vector + [time, alpha, epsilon], updates)
 
 def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3):
     r = []
@@ -486,13 +496,12 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
     return train_error
 
 def saveParams(params, f):
-    def get_numpy():
-        num = []
-        for p in params:
-            num.append(p.get_value())
-        return num
-    arr = get_numpy()
+    print("Saving...Do not close")
+    arr = []
+    for p in params:
+        arr.append(p.get_value())
     np.savez(f, *arr)
+    print("Done!")
 
 def loadParams(params, f):
     def load_npz(npz):

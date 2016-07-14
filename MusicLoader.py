@@ -24,10 +24,11 @@ def convertMusicFile(index, inputsize=1000):
     data = data[index1:(index2 + 1)]
     data = data.flatten()
     data.resize(data.shape[0]//inputsize, inputsize)
+
     return data
 
 def generateMusicFile(arr, f):
-    data = arr.flatten().reshape(arr.size/2, 2)
+    data = arr.flatten().reshape(arr.size/2, 2).astype('int16')
     wavUtil.write(f, 44100, data)
 
 def testPrediction(predict):
@@ -35,34 +36,51 @@ def testPrediction(predict):
     newSong = generateMusicFile(predict(data), open("test.wav", 'wb'))
 
 def testLSTM():
-    data = convertMusicFile(0)
+    theano.config.floatX = 'float32'
+    orgdata = convertMusicFile(0)
+    scale, data = normalize(orgdata)
+    print("Difference:", np.sum(np.abs(orgdata-scaleBack(data, scale))))
     lstm = LSTM(1000, 1000, verbose=True, init_size=0.1, out_type='linear')
 
 
     x = data[:-1]
-    '''
-    print("Writing music file...")
-    generateMusicFile(x, 'test.wav')
-    print("Done!")
-    '''
+    # print("Writing music file...")
+    # generateMusicFile(x, 'test.wav')
+    # print("Done!")
     y = data[1:]
     print(x.shape)
 
-    (rprop, rupdates) = generateRpropUpdates(lstm.params, lstm.error,
-            init_size=0.1, verbose=True)
-    (adamstorage, adam) = generateAdam(lstm.params, lstm.error, alpha=1,
+    # (rprop, rupdates) = generateRpropUpdates(lstm.params, lstm.error,
+            # init_size=0.1, verbose=True)
+    (adamstorage, adam) = generateAdam(lstm.params, lstm.error, alpha=0.01,
             verbose=True)
 
-    learnFunc = theano.function([lstm.x, lstm.y], lstm.error, updates=rupdates)
+    learnFunc = theano.function([lstm.x, lstm.y], lstm.error, updates=adam
+            ,allow_input_downcast=True)
     lstm.reset()
 
-    train_error = miniBatchLearning(x[:1000], y[:1000], -1, learnFunc,
-            verbose=True, epochs=100)
-    '''
-    train_error = miniRecurrentLearning(x, y, 10, learnFunc, lstm.predict, 
-            verbose=True, miniepochs=10)
-    '''
-    generateMusicFile(x[:1000], open('test.wav', 'wb'))
+    # train_error = miniBatchLearning(x[:1000], y[:1000], -1, learnFunc,
+            # verbose=True, epochs=100)
+
+    savefile = "musicloader"
+    params = lstm.params + adamstorage
+    def save():
+        saveParams(params, savefile)
+    def load():
+        loadParams(params, savefile)
+    def test():
+        print("Generating sample music file")
+        generateMusicFile(scaleBack(orgdata[:1000], scale),
+                open('original.wav', 'wb'))
+        generateMusicFile(scaleBack(lstm.predict(x[:1000]), scale)
+                , open('test.wav', 'wb'))
+        print("Done")
+    test()
+    save()
+    train_error = miniRecurrentLearning(x, y, 10, learnFunc, lstm.predict,
+            verbose=True, miniepochs=1, save=save, saveiters=500)
+    generateMusicFile(scaleBack(predict(x[:1000]), scale)
+            , open('test.wav', 'wb'))
     plt.plot(np.arange(len(train_error)), train_error)
     plt.yscale('log')
     plt.show()
@@ -163,4 +181,4 @@ def testConvNet():
 
 
 if __name__ == '__main__':
-    testConvNet()
+    testLSTM()
