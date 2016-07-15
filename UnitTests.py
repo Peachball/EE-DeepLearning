@@ -43,6 +43,5 @@ class TestTrainers(unittest.TestCase):
 
         XL_dat = 10 * np.sin(np.arange(10000).reshape(5000, 2))
 
-        print(np.sum(np.abs(XL_dat[:4864] - FT_to_wav(wav_to_FT(XL_dat)))))
-        assert np.sum(np.abs(XL_dat[:4864] - FT_to_wav(wav_to_FT(XL_dat)))) < 1
         assert np.sum(np.abs(X_dat[:256] - FT_to_wav(wav_to_FT(X_dat)))) < 1
+        assert np.sum(np.abs(XL_dat[:4864] - FT_to_wav(wav_to_FT(XL_dat)))) < 1

@@ -41,8 +41,6 @@ def testPrediction(predict):
 
 def wav_to_FT(data, chunk_size=1024):
     """
-        Numpy 2d array -> Numpy 2d array
-
         Convert list of numbers representing sound file into it's respective
         fourier transform
 
@@ -63,18 +61,26 @@ def wav_to_FT(data, chunk_size=1024):
     output = np.zeros((data.size * 2 / chunk_size, chunk_size))
 
     row_counter = 0
-    for i in range(0, data.shape[0], chunk_size / channels):
+    for i in range(0, data.shape[0], chunk_size / (2 * channels)):
         row = []
         for j in range(channels):
-            comp = np.fft.fft(data[i:i + (chunk_size / channels), j])
+            comp = np.fft.fft(data[i:i + (chunk_size / (2 * channels)), j])
             row = row + list(comp.real) + list(comp.imag)
         if len(row) != chunk_size:
             break
         output[row_counter] = row
+        row_counter += 1
 
     return output
 
 def FT_to_wav(data, channels=2):
+    """
+        Convert result of fourier transform into a wav file
+
+        Paramaters:
+            data     - 2d array output of wav_to_FT()
+            channels - number of channels that the original sound file had
+    """
     output = np.zeros((data.size / (2 * channels), channels))
 
     time = 0
