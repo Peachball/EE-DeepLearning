@@ -8,6 +8,10 @@ import numpy as np
 import scipy.io.wavfile as wavUtil
 import matplotlib.pyplot as plt
 from RecurrentNetworks import *
+import scipy.fftpack
+import warnings
+
+SAMPLE_RATE = 44100
 
 def convertMusicFile(index, inputsize=1000):
     filename = 'musicDataSet/' + str(index) + '.wav'
@@ -28,57 +32,129 @@ def convertMusicFile(index, inputsize=1000):
     return data
 
 def generateMusicFile(arr, f):
-    data = arr.flatten().reshape(arr.size/2, 2).astype('int16')
+    data = arr.reshape(arr.size/2, 2).astype('int32')
     wavUtil.write(f, 44100, data)
 
 def testPrediction(predict):
     data = convertMusicFile(0)[:1000]
     newSong = generateMusicFile(predict(data), open("test.wav", 'wb'))
 
+def wav_to_FT(data, chunk_size=1024):
+    """
+        Numpy 2d array -> Numpy 2d array
+
+        Convert list of numbers representing sound file into it's respective
+        fourier transform
+
+        Variable interp.
+            data       - 1st dimension represents time
+                       - 2nd dimension represents audio channels
+            chunk_size - number of columns of output array (number of features)
+
+    NOTE: The chunk_size here is different than the chunk_size variable used
+          for the inverse method (wav_to_FT())
+    """
+
+    channels = data.shape[1]
+    if chunk_size % (channels * 2) != 0:
+        print("Warning: output data will not have the desired number of"
+              "columns")
+
+    output = np.zeros((data.size * 2 / chunk_size, chunk_size))
+
+    row_counter = 0
+    for i in range(0, data.shape[0], chunk_size / channels):
+        row = []
+        for j in range(channels):
+            comp = np.fft.fft(data[i:i + (chunk_size / channels), j])
+            row = row + list(comp.real) + list(comp.imag)
+        if len(row) != chunk_size:
+            break
+        output[row_counter] = row
+
+    return output
+
+def FT_to_wav(data, channels=2):
+    output = np.zeros((data.size / (2 * channels), channels))
+
+    time = 0
+
+    chunk_time_size = data.shape[1] / (2 * channels)
+    for row in data:
+        time_length = data.shape[1] / channels
+
+        curchannel = 0
+        for c in range(0, data.shape[1], time_length):
+            ft = row[c:(c+time_length/2)] + 1j * \
+                row[(c+time_length/2):(c+time_length)]
+            org = np.fft.ifft(ft)
+            output[time:(time+chunk_time_size),curchannel] = org
+            curchannel += 1
+        time += chunk_time_size
+    return output
+
+def viewFT(x):
+    x = x.reshape(x.size/2, 2)
+    xf1 = scipy.fftpack.fft(x)
+    scale = np.linspace(0, 1/SAMPLE_RATE, x.shape[0])
+    plt.plot(scale, xf1)
+    plt.show()
+
 def testLSTM():
     theano.config.floatX = 'float32'
     orgdata = convertMusicFile(0)
     scale, data = normalize(orgdata)
-    print("Difference:", np.sum(np.abs(orgdata-scaleBack(data, scale))))
     lstm = LSTM(1000, 1000, verbose=True, init_size=0.1, out_type='linear')
 
 
     x = data[:-1]
-    # print("Writing music file...")
-    # generateMusicFile(x, 'test.wav')
-    # print("Done!")
-    y = data[1:]
-    print(x.shape)
+    # y = data[1:]
+    y = x
+    viewFT(x)
 
     # (rprop, rupdates) = generateRpropUpdates(lstm.params, lstm.error,
             # init_size=0.1, verbose=True)
-    (adamstorage, adam) = generateAdam(lstm.params, lstm.error, alpha=0.01,
+    # (adamstorage, adam) = generateAdam(lstm.params, lstm.error, alpha=0.01,
+            # verbose=True)
+    (storage , rms) = generateRmsProp(lstm.params, lstm.error, alpha=0.01,
             verbose=True)
 
-    learnFunc = theano.function([lstm.x, lstm.y], lstm.error, updates=adam
-            ,allow_input_downcast=True)
-    lstm.reset()
 
     # train_error = miniBatchLearning(x[:1000], y[:1000], -1, learnFunc,
             # verbose=True, epochs=100)
 
     savefile = "musicloader"
-    params = lstm.params + adamstorage
-    def save():
-        saveParams(params, savefile)
-    def load():
-        loadParams(params, savefile)
+    params = lstm.params + storage
     def test():
         print("Generating sample music file")
-        generateMusicFile(scaleBack(orgdata[:1000], scale),
-                open('original.wav', 'wb'))
         generateMusicFile(scaleBack(lstm.predict(x[:1000]), scale)
-                , open('test.wav', 'wb'))
+                , open('test' + str(test.count) + '.wav', 'wb'))
+        test.count += 1
         print("Done")
-    test()
-    save()
+
+    test.count = 0
+
+    def save():
+        saveParams(params, savefile)
+        test()
+
+    def load():
+        print("Attempting to load paramaters")
+        loadParams(params, savefile + ".npz")
+        print("Successfully loaded")
+
+
+    try:
+        load()
+    except:
+        print("Failed to load params")
+        save()
+
+    learnFunc = theano.function([lstm.x, lstm.y], lstm.error, updates=rms
+            ,allow_input_downcast=True)
+    lstm.reset()
     train_error = miniRecurrentLearning(x, y, 10, learnFunc, lstm.predict,
-            verbose=True, miniepochs=1, save=save, saveiters=500)
+            verbose=True, miniepochs=1, save=save, saveiters=50)
     generateMusicFile(scaleBack(predict(x[:1000]), scale)
             , open('test.wav', 'wb'))
     plt.plot(np.arange(len(train_error)), train_error)

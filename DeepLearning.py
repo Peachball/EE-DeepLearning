@@ -173,12 +173,14 @@ def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999,
     print("")
     return (moment + vector + [time, alpha, epsilon], updates)
 
-def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3):
+def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3,
+        verbose=False):
     r = []
     v = []
     pr = []
     updates = []
     alpha = theano.shared(np.array(alpha).astype(theano.config.floatX))
+    count = 0
     for p in params:
         grad = T.grad(error, p)
 
@@ -194,7 +196,12 @@ def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3):
         r.append(r_t)
         v.append(v_t)
 
-    return [[r, v, [alpha]], updates]
+        count += 1
+        if verbose: print("\rGradient {}/{} done".format(count, len(params)),
+                end="")
+
+    print('')
+    return (r + v + [alpha], updates)
 
 def generateVanillaUpdates(params, error, alpha=0.01):
     grad = []
@@ -510,6 +517,7 @@ def loadParams(params, f):
             j[int(i.replace('arr_', ''))] = npz[i]
         return j
     p = load_npz(np.load(f))
+    if len(params) != len(p): raise "Paramater length mismatch"
     for par, n in zip(params, p):
         par.set_value(p[n])
 

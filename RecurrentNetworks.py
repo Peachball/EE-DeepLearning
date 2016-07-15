@@ -346,7 +346,6 @@ def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
     if batchSize <= 0: batchSize = x.shape[0]
     iterations = 0
     for j in range(epochs):
-        print(batchSize)
         for batch in range(0, x.shape[0]):
             train_error = train_error + miniBatchLearning(x[batch:batch+batchSize],
                     y[batch:batch+batchSize], -1, learn, verbose=False,
