@@ -201,7 +201,7 @@ def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3,
                 end="")
 
     print('')
-    return (r + v + [alpha], updates)
+    return (r + v, updates)
 
 def generateVanillaUpdates(params, error, alpha=0.01):
     grad = []

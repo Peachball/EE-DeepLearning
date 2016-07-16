@@ -17,22 +17,19 @@ def convertMusicFile(index, inputsize=1000):
     filename = 'musicDataSet/' + str(index) + '.wav'
     samplerate, data = wavUtil.read(filename)
 
+    #Get rid of quiet parts in the beginning and end
     index1 = 0
     index2 = -1
     while data[index1][0] == 0 and data[index1][1] == 0:
         index1 += 1
-
     while data[index2][0] == 0 and data[index2][1] == 0:
         index2 -= 1
-
     data = data[index1:(index2 + 1)]
-    data = data.flatten()
-    data.resize(data.shape[0]//inputsize, inputsize)
 
     return data
 
 def generateMusicFile(arr, f):
-    data = arr.reshape(arr.size/2, 2).astype('int32')
+    data = arr.reshape(arr.size/2, 2).astype('int16')
     wavUtil.write(f, 44100, data)
 
 def testPrediction(predict):
@@ -61,7 +58,7 @@ def wav_to_FT(data, chunk_size=1024):
     output = np.zeros((data.size * 2 / chunk_size, chunk_size))
 
     row_counter = 0
-    for i in range(0, data.shape[0], chunk_size / (2 * channels)):
+    for i in range(0, data.shape[0], chunk_size // (2 * channels)):
         row = []
         for j in range(channels):
             comp = np.fft.fft(data[i:i + (chunk_size / (2 * channels)), j])
@@ -87,7 +84,7 @@ def FT_to_wav(data, channels=2):
 
     chunk_time_size = data.shape[1] / (2 * channels)
     for row in data:
-        time_length = data.shape[1] / channels
+        time_length = data.shape[1] // channels
 
         curchannel = 0
         for c in range(0, data.shape[1], time_length):
@@ -109,20 +106,19 @@ def viewFT(x):
 def testLSTM():
     theano.config.floatX = 'float32'
     orgdata = convertMusicFile(0)
-    scale, data = normalize(orgdata)
-    lstm = LSTM(1000, 1000, verbose=True, init_size=0.1, out_type='linear')
+    scale, data = normalize(wav_to_FT(orgdata))
+    lstm = LSTM(1024, 1024, verbose=True, init_size=0.1, out_type='linear')
 
 
     x = data[:-1]
     # y = data[1:]
     y = x
-    viewFT(x)
 
     # (rprop, rupdates) = generateRpropUpdates(lstm.params, lstm.error,
             # init_size=0.1, verbose=True)
     # (adamstorage, adam) = generateAdam(lstm.params, lstm.error, alpha=0.01,
             # verbose=True)
-    (storage , rms) = generateRmsProp(lstm.params, lstm.error, alpha=0.01,
+    (storage , rms) = generateRmsProp(lstm.params, lstm.error, alpha=0.001,
             verbose=True)
 
 
@@ -133,7 +129,11 @@ def testLSTM():
     params = lstm.params + storage
     def test():
         print("Generating sample music file")
-        generateMusicFile(scaleBack(lstm.predict(x[:1000]), scale)
+        result = FT_to_wav(scaleBack(data, scale))
+        # print(np.sum(np.abs(
+            # orgdata[:result.shape[0]] - FT_to_wav(scaleBack(data, scale)))))
+        generateMusicFile(
+                FT_to_wav(scaleBack(lstm.predict(x[:1000]), scale)).real
                 , open('test' + str(test.count) + '.wav', 'wb'))
         test.count += 1
         print("Done")
@@ -149,7 +149,7 @@ def testLSTM():
         loadParams(params, savefile + ".npz")
         print("Successfully loaded")
 
-
+    test()
     try:
         load()
     except:
@@ -161,8 +161,6 @@ def testLSTM():
     lstm.reset()
     train_error = miniRecurrentLearning(x, y, 10, learnFunc, lstm.predict,
             verbose=True, miniepochs=1, save=save, saveiters=50)
-    generateMusicFile(scaleBack(predict(x[:1000]), scale)
-            , open('test.wav', 'wb'))
     plt.plot(np.arange(len(train_error)), train_error)
     plt.yscale('log')
     plt.show()

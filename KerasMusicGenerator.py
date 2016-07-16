@@ -1,6 +1,8 @@
+import keras
 
 config = {
-        'model_file' : 'musicgen.h5'
+        'model_file' : 'musicgen.h5',
+        'freq_channels' : 512
         }
 
 def load_model():
