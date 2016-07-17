@@ -107,18 +107,18 @@ def testLSTM():
     theano.config.floatX = 'float32'
     orgdata = convertMusicFile(0)
     scale, data = normalize(wav_to_FT(orgdata))
-    lstm = LSTM(1024, 1024, verbose=True, init_size=0.1, out_type='linear')
+    lstm = LSTM(1024, 800, 800, 1024, verbose=True, init_size=0.1, out_type='linear')
 
 
     x = data[:-1]
-    # y = data[1:]
-    y = x
+    y = data[1:]
+    # y = x
 
     # (rprop, rupdates) = generateRpropUpdates(lstm.params, lstm.error,
             # init_size=0.1, verbose=True)
     # (adamstorage, adam) = generateAdam(lstm.params, lstm.error, alpha=0.01,
             # verbose=True)
-    (storage , rms) = generateRmsProp(lstm.params, lstm.error, alpha=0.001,
+    (storage , rms) = generateRmsProp(lstm.params, lstm.error, alpha=0.01,
             verbose=True)
 
 
@@ -149,10 +149,24 @@ def testLSTM():
         loadParams(params, savefile + ".npz")
         print("Successfully loaded")
 
+    def load_newfile(filename):
+        samplerate, data = wavUtil.read(filename)
+        _, x = normalize(wav_to_FT(data), scaleFactor=scale)
+
+        print(x.shape)
+        reconstructed = lstm.predict(x)
+        output = FT_to_wav(scaleBack(reconstructed, scale))
+
+        generateMusicFile(output, open(filename + ".gen.wav", "wb"))
+
+
     test()
     try:
         load()
-    except:
+        # load_newfile("testsound.wav")
+        # print("loaded testsound too")
+    except Exception as e:
+        print(e)
         print("Failed to load params")
         save()
 
@@ -258,6 +272,25 @@ def testConvNet():
     print(finalP.min(), finalP.max())
     print(x.min(), x.max())
 
+def testKerasLSTM():
+    #Load data
+    orgdata = convertMusicFile(0)
+
+    scale, data = normalize(wav_to_FT(orgdata))
+    x = data[np.newaxis, :-1]
+    y = data[np.newaxis,1:]
+
+    #Build lstm model
+    from keras.models import Sequential
+    from keras.layers import LSTM
+    from keras.optimizers import RMSprop
+
+    model = Sequential()
+    model.add(LSTM(1024, input_dim=1024, return_sequences=True))
+
+    model.compile(RMSprop(lr=0.01), 'mse')
+
+    model.fit(x, y)
 
 
 if __name__ == '__main__':

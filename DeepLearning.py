@@ -170,7 +170,7 @@ def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999,
         if verbose: print("\rDone with {}/{}".format(i+1, len(params)), end="")
         i += 1
 
-    print("")
+    if verbose: print("")
     return (moment + vector + [time, alpha, epsilon], updates)
 
 def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3,
@@ -200,7 +200,7 @@ def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3,
         if verbose: print("\rGradient {}/{} done".format(count, len(params)),
                 end="")
 
-    print('')
+    if verbose: print('')
     return (r + v, updates)
 
 def generateVanillaUpdates(params, error, alpha=0.01):
@@ -517,13 +517,41 @@ def loadParams(params, f):
             j[int(i.replace('arr_', ''))] = npz[i]
         return j
     p = load_npz(np.load(f))
-    if len(params) != len(p): raise "Paramater length mismatch"
+    if len(params) != len(p):
+        raise "Paramater length mismatch"
     for par, n in zip(params, p):
         par.set_value(p[n])
 
 def smartTrainer(x, y, batchSize, maxepochs=10, verbose=False, patience=2,
         decrease_rate=0.95):
     pass
+
+def KerasAETester():
+    from keras.models import Model
+    from keras.layers import Input, Dense
+    from keras.optimizers import RMSprop
+
+    images, labels = readMNISTData(10000)
+    xcv, ycv = readcv(100)
+
+    picture = Input(shape=(784,))
+
+    encoder = Dense(500, activation='relu')(picture)
+
+    decoder = Dense(784, activation='linear')(encoder)
+
+    model = Model(input=picture, output=decoder)
+
+    model.compile(RMSprop(lr=0.01), loss='mse')
+
+    model.fit(images, images, verbose=1)
+    for i in range(len(images)):
+        generated_image = model.predict(images[i].reshape(1, 784))
+        plt.imshow(generated_image.reshape(28, 28), cmap='Greys',
+                interpolation='none')
+        plt.figure()
+        plt.imshow(images[i].reshape(28, 28), cmap='Greys', interpolation='none')
+        plt.show()
 
 def AETester():
     images, labels = readMNISTData(1000)
@@ -551,7 +579,7 @@ def AETester():
             init_size=0.01)
     (rmsstorage, rms) = generateRmsProp(ae.params, mse, alpha=0.01)
 
-    learn = theano.function([ae.x, y], mse, updates=adaGrad,
+    learn = theano.function([ae.x, y], mse, updates=rms,
             allow_input_downcast=True)
     train_error = miniBatchLearning(images, images, 100, learn, verbose=True,
             epochs=100)
@@ -641,6 +669,16 @@ def scaleBack(x, scale):
     maxes, means = scale
     return (x*maxes) + means
 
+
+from PIL import Image
+def convertImageToArray(index, size=(100, 100)):
+    filename = 'imageDataSet/' + str(index)
+    im = Image.open(filename)
+    if size:
+        im.thumbnail(size, Image.ANTIALIAS)
+    im.load()
+    return np.asarray(im)
+
 def ConvolutionDreamerTest():
     conv = ConvolutionalAutoEncoder((3, 3, 15, 15), init_size=0.01,
             out_nonlinearity=lambda x: T.maximum(0.01 * x, x),
@@ -681,13 +719,6 @@ def ConvolutionDreamerTest():
                     downloadImage(item['link'], i)
                 except:
                     print('Failed to download:', item['title'])
-    from PIL import Image
-    def convertImageToArray(index, size=(100, 100)):
-        filename = 'imageDataSet/' + str(index)
-        im = Image.open(filename)
-        im.thumbnail(size, Image.ANTIALIAS)
-        im.load()
-        return np.asarray(im)
 
 
     curImage = convertImageToArray(3, size=(20, 20))
@@ -733,9 +764,48 @@ def ConvolutionDreamerTest():
     plt.plot(np.arange(len(train_error)), train_error)
     plt.yscale('log')
     plt.show()
+    # saveParams(info, 'convae')
 
-#    saveParams(info, 'convae')
+    return
+
+def KerasConvolutionDreamerTest():
+    from keras.layers import Input
+    from keras.models import Model
+    from keras.layers import Convolution2D, MaxPooling2D, UpSampling2D
+
+    def showImage(img):
+        img = np.squeeze(img)
+        plt.figure()
+        plt.imshow(img.transpose(1, 2, 0))
+        pass
+
+    image = convertImageToArray(3, size=(800, 800))
+    image = image.transpose(2, 1, 0)
+    image = image[np.newaxis,:]
+
+    scale, image = normalize(image)
+    showImage(scaleBack(image, scale))
+    plt.show()
+
+    pic = Input(shape=(3, 800, 800))
+
+    encoder = Convolution2D(3, 15, 15, activation='relu',
+            border_mode='same')(pic)
+    encoder = MaxPooling2D((2, 2), border_mode='same')(encoder)
+
+    decoder = Convolution2D(3, 15, 15, activation='linear',
+            border_mode='same')(encoder)
+    decoder = UpSampling2D((2, 2))(decoder)
+
+    model = Model(input=pic, output=decoder)
+
+    model.compile(optimizer='adadelta', loss='mse')
+
+    model.fit(image, image, nb_epoch=1)
+
+    showImage(scaleBack(model.predict(image), scale))
+    plt.show()
 
 
 if __name__ == '__main__':
-    ConvolutionDreamerTest()
+    KerasConvolutionDreamerTest()

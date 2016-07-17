@@ -45,3 +45,7 @@ class TestTrainers(unittest.TestCase):
 
         assert np.sum(np.abs(X_dat[:256] - FT_to_wav(wav_to_FT(X_dat)))) < 1
         assert np.sum(np.abs(XL_dat[:4864] - FT_to_wav(wav_to_FT(XL_dat)))) < 1
+
+class EyeConvnetTest(unittest.TestCase):
+    def setup_dataTest(self):
+        pass

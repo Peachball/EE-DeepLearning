@@ -1,3 +1,5 @@
+from keras.models import Sequential
+from keras.layers.recurrent import LSTM, GRU
 import keras
 
 config = {
@@ -6,6 +8,8 @@ config = {
         }
 
 def load_model():
+    model = Sequential()
+    model.add(LSTM(800, input_dim=config['freq_channels']*2))
     pass
 
 def generate_model():
