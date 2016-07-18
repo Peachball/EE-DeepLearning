@@ -211,7 +211,7 @@ def LearnSnake():
 
     print("time to watch some snake")
     #Snake Drawing things
-    
+
     lam = 0.9
     maxMoves = boardSize * boardSize // 2
     mem = []
@@ -245,7 +245,7 @@ def LearnSnake():
                 time.sleep(0.1)
             status = nextIter(b, move)
             after = np.array(convertBoard(b, style=style)).reshape(1, inputsize)
-    
+
             r = 0
             tooSlow += 1
             if status > 0:
@@ -343,6 +343,170 @@ def LearnSnake():
         b[0][0] = 1
         addApple(b)
 
+def KerasSnake():
+    boardSize = 10
+    scr = pygame.display.set_mode((width, height))
+    b = createBoard(boardSize)
+    b[0][1] = 1
+    addApple(b)
+
+
+    #Learn snake now
+
+    #Importance of future rewards
+    lam = 0.9
+    maxMoves = boardSize * boardSize // 2
+    mem = []
+    rew = []
+    act = []
+    nstate = []
+    maxSize = 0
+    maxMem = 10000
+    draw = False
+    style = 'legit'
+    maxMoves = -1
+    if style == 'shady':
+        inputsize = 3 * boardSize ** 2
+    elif style=='legit':
+        inputsize = 2 * boardSize**2
+    #Temperature
+    temp = 1
+
+    #Generate model
+    from keras.layers import Dense
+    from keras.models import Sequential, Model
+    from keras.optimizers import SGD, RMSprop
+    model = Sequential()
+    model.add(Dense(700, input_dim=inputsize, activation='tanh'))
+    model.add(Dense(500, activation='tanh'))
+    model.add(Dense(300, activation='tanh'))
+    model.add(Dense(100, activation='tanh'))
+    model.add(Dense(4, activation='linear'))
+
+    sgd = SGD(lr=0.001, nesterov=True)
+    rms = RMSprop(lr=0.0001)
+    model.compile(optimizer=rms, loss='mse')
+    try:
+        model.load_weights("snake.h5")
+    except Exception as e:
+        print("Unable to load weights")
+
+    while True:
+        moves = 0
+        tooSlow = 0
+        prevMove = -1
+        while True:
+            moves += 1
+            bef = np.array(convertBoard(b, style=style)).reshape(1, inputsize)
+            prediction = model.predict(bef)
+            move = predict(prediction, temperature=temp, noDir=-1)
+            prevMove = move
+            if draw:
+                clear(scr)
+                display(b, scr)
+                pygame.display.update()
+                time.sleep(0.1)
+            status = nextIter(b, move)
+            after = np.array(convertBoard(b, style=style)).reshape(1, inputsize)
+
+            r = 0
+            tooSlow += 1
+            if status > 0:
+                if addApple(b) == 1:
+                    print("AI Won!")
+                    break
+                r = 1
+                tooSlow = 0
+            end = False
+            if status < 0 or tooSlow > maxMoves > 0:
+                if status < 0:
+                    r = -1
+                end = True
+
+            mem.append(np.squeeze(bef))
+            nstate.append(np.squeeze(after))
+            act.append(move)
+            rew.append(r)
+#            print(p(bef).max() - p(bef).min())
+#            print(p(bef))
+            if end:
+                break
+        [size, _] = evalSize(b)
+        if size > maxSize and size > 5:
+            maxSize = size
+            print("Max Size: ", size)
+            print("Temperature: ", temp)
+
+            #Play a sample game of snake
+            status = 0
+            board = createBoard(boardSize)
+            board[0][0] = 1
+            addApple(board)
+            prevMove = -1
+            while status >= 0:
+                clear(scr)
+                display(board, scr)
+                pygame.display.flip()
+                time.sleep(0.1)
+                c = np.array(convertBoard(board, style=style)).reshape(1, inputsize)
+                move = predict(model.predict(c), temperature=temp, noDir=-1)
+                prevMove = move
+                status = nextIter(board, move)
+                if status > 0:
+                    if addApple(board) == 1:
+                        break
+        if len(mem) > 1000:
+            def pickSamples(size=100):
+                if size > len(mem) or size is None or size < 0:
+                    size = len(mem)
+                samples = random.sample(range(len(mem)), size)
+
+                return ([mem[i] for i in samples], 
+                        [rew[i] for i in samples],
+                        [act[i] for i in samples],
+                        [nstate[i] for i in samples])
+            def getTarget(m, r, a, s):
+                cor = model.predict(np.array(m))
+                cor[range(len(cor)),a] = np.greater_equal(r, 0) *\
+                        (lam * np.max(model.predict(np.array(s)),
+                    axis=1)) + r
+                '''
+                print(cor[range(len(cor)), a])
+                print("Prediction:", p(np.array(s)))
+                print("Rewards: ", r)
+                print("Actions: ", a)
+                print("Correct: ", cor)
+                raw_input('hm')
+                '''
+                return cor
+
+            def genData(size=100):
+                data = pickSamples(size)
+                return data[0], getTarget(data[0], data[1], data[2], data[3])
+            error = 10
+            a, b = genData(size=None)
+#            a, b = mem, getTarget(mem, rew, act, nstate)
+            a = np.array(a)
+            b = np.array(b)
+            error = model.train_on_batch(a, b)
+            print(error)
+            '''
+            mem = []
+            rew = []
+            act = []
+            nstate = []
+            '''
+            if temp > 0.1:
+                temp *= 0.999
+        if len(mem) > maxMem:
+            del mem[:-maxMem]
+            del rew[:-maxMem]
+            del act[:-maxMem]
+            del nstate[:-maxMem]
+        b = createBoard(boardSize)
+        b[0][0] = 1
+        addApple(b)
+
 
 if __name__ == '__main__':
-    LearnSnake()
+    KerasSnake()

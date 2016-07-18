@@ -6,8 +6,9 @@ import tensorflow as tf
 import os
 import random
 import matplotlib.pyplot as plt
-from keras.layers import Convolution2D, MaxPooling2D, Dense, Flatten
+from keras.layers import Convolution2D, MaxPooling2D, Dense, Flatten, Dropout
 from keras.models import Model, Sequential, model_from_yaml
+from keras.optimizers import SGD
 import h5py
 
 config = {
@@ -187,7 +188,7 @@ def get_data(noeye=0, nosee=0, see=0):
 
 
 def KerasEyeObserver():
-    X_dat, Y_dat = get_data(noeye=200, nosee=200, see=200)
+    X_dat, Y_dat = get_data(noeye=5, nosee=5, see=5)
     scale = (256, 128)
     _, X = normalize(X_dat.transpose(0, 3, 1, 2), scaleFactor = scale)
 
@@ -197,63 +198,51 @@ def KerasEyeObserver():
         # plt.show()
         # count+=1
 
-    act = 'softplus'
+    act = 'relu'
 
     #Generate model (Based off of VGGs ImageNet)
     print("Generating model")
     model = Sequential()
 
-    model.add(Convolution2D(64, 3, 3, activation=act, border_mode='same',
-                        input_shape=(3,)+config['image_dimension'][::-1]))
-    model.add(Convolution2D(64, 3, 3, activation=act,
-        border_mode='same'))
+    model.add(Convolution2D(96, 11, 11, activation=act, border_mode='same',
+                        input_shape=(3,)+config['image_dimension'][::-1],
+                        subsample=(4, 4)))
     model.add(MaxPooling2D((2, 2), border_mode='same'))
-
-
-    model.add(Convolution2D(128, 3, 3, activation=act,
+    model.add(Convolution2D(256, 5, 5, activation=act,
         border_mode='same'))
-    model.add(Convolution2D(128, 3, 3, activation=act,
-        border_mode='same'))
-    model.add(MaxPooling2D((2, 2), border_mode='same'))
+
 
     model.add(Convolution2D(256, 3, 3, activation=act,
         border_mode='same'))
-    model.add(Convolution2D(256, 3, 3, activation=act,
-        border_mode='same'))
-    model.add(Convolution2D(256, 3, 3, activation=act,
+    model.add(Convolution2D(192, 3, 3, activation=act,
         border_mode='same'))
     model.add(MaxPooling2D((2, 2), border_mode='same'))
 
-    model.add(Convolution2D(512, 3, 3, activation=act,
+    model.add(Convolution2D(384, 3, 3, activation=act,
         border_mode='same'))
-    model.add(Convolution2D(512, 3, 3, activation=act,
+    model.add(Convolution2D(384, 3, 3, activation=act,
         border_mode='same'))
-    model.add(Convolution2D(512, 3, 3, activation=act,
+    model.add(Convolution2D(256, 3, 3, activation=act,
         border_mode='same'))
-    model.add(MaxPooling2D((2, 2), border_mode='same'))
-
-    model.add(Convolution2D(512, 3, 3, activation=act,
-        border_mode='same'))
-    model.add(Convolution2D(512, 3, 3, activation=act,
-        border_mode='same'))
-    model.add(Convolution2D(512, 3, 3, activation=act,
-        border_mode='same'))
-    model.add(MaxPooling2D((2, 2), border_mode='same'))
 
     model.add(Flatten())
 
-    model.add(Dense(3, activation='sigmoid'))
+    model.add(Dense(4096, activation='tanh'))
+    model.add(Dense(4096, activation='tanh'))
+    model.add(Dense(3, activation='softmax'))
 
     print("Compiling model")
-    model.compile(optimizer='nadam', loss='binary_crossentropy',
+    sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
+    model.compile(optimizer=sgd, loss='categorical_crossentropy',
                     metrics=['accuracy'])
 
     try:
         model.load_weights("eyeobserver.h5")
     except Exception as e:
         print(e)
-    history = model.fit(X, Y_dat, batch_size=10, validation_split=0.2,
-            nb_epoch=2)
+
+    history = model.fit(X, Y_dat, batch_size=3, validation_split=0.2,
+            nb_epoch=20)
 
     model.save_weights("eyeobserver.h5")
 
