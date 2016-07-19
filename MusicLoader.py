@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from RecurrentNetworks import *
 import scipy.fftpack
 import warnings
+import random
 
 SAMPLE_RATE = 44100
 
@@ -272,13 +273,31 @@ def testConvNet():
     print(finalP.min(), finalP.max())
     print(x.min(), x.max())
 
+def create_examples(x, length=128, examples=None):
+
+    if examples is None:
+        examples = x.shape[0] // length
+    if examples > x.shape[0]:
+        examples = x.shape[0]
+
+    x_out = np.zeros((examples, length, x.shape[1]))
+    y_out = np.zeros((examples, x.shape[1]))
+
+    count = 0
+    for i in random.sample(range(x.shape[0] - length), examples):
+        x_out[count] = x[i:(i+length)]
+        y_out[count] = x[i+length+1]
+        count += 1
+    return x_out, y_out
+
 def testKerasLSTM():
     #Load data
     orgdata = convertMusicFile(0)
 
     scale, data = normalize(wav_to_FT(orgdata))
-    x = data[np.newaxis, :-1]
-    y = data[np.newaxis,1:]
+
+    X_ex, Y_ex = create_examples(data)
+
 
     #Build lstm model
     from keras.models import Sequential
@@ -286,12 +305,31 @@ def testKerasLSTM():
     from keras.optimizers import RMSprop
 
     model = Sequential()
-    model.add(LSTM(1024, input_dim=1024, return_sequences=True))
+    model.add(LSTM(1024, input_dim=1024, return_sequences=False))
 
     model.compile(RMSprop(lr=0.01), 'mse')
 
-    model.fit(x, y)
+
+    def generateSample(length=150, seed=None):
+        if seed is None:
+            seed = data[:128]
+        song = seed
+
+        while song.shape[0] < length:
+            y = model.predict(seed[None,-128:])
+            song = np.concatenate((song, y), axis=0)
+        song = np.squeeze(song)
+
+        generateMusicFile(FT_to_wav(scaleBack(song, scale)),
+                open('test' + str(generateSample.count) + '.wav', 'wb'))
+        generateSample.count += 1
+
+    generateSample.count = 0
+
+    while True:
+        generateSample()
+        model.fit(X_ex, Y_ex)
 
 
 if __name__ == '__main__':
-    testLSTM()
+    testKerasLSTM()

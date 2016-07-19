@@ -8,7 +8,7 @@ import random
 import matplotlib.pyplot as plt
 from keras.layers import Convolution2D, MaxPooling2D, Dense, Flatten, Dropout
 from keras.models import Model, Sequential, model_from_yaml
-from keras.optimizers import SGD
+from keras.optimizers import SGD, RMSprop
 import h5py
 
 config = {
@@ -188,7 +188,7 @@ def get_data(noeye=0, nosee=0, see=0):
 
 
 def KerasEyeObserver():
-    X_dat, Y_dat = get_data(noeye=5, nosee=5, see=5)
+    X_dat, Y_dat = get_data(noeye=200, nosee=0, see=200)
     scale = (256, 128)
     _, X = normalize(X_dat.transpose(0, 3, 1, 2), scaleFactor = scale)
 
@@ -218,12 +218,12 @@ def KerasEyeObserver():
         border_mode='same'))
     model.add(MaxPooling2D((2, 2), border_mode='same'))
 
-    model.add(Convolution2D(384, 3, 3, activation=act,
-        border_mode='same'))
-    model.add(Convolution2D(384, 3, 3, activation=act,
-        border_mode='same'))
-    model.add(Convolution2D(256, 3, 3, activation=act,
-        border_mode='same'))
+    # model.add(Convolution2D(384, 3, 3, activation=act,
+        # border_mode='same'))
+    # model.add(Convolution2D(384, 3, 3, activation=act,
+        # border_mode='same'))
+    # model.add(Convolution2D(256, 3, 3, activation=act,
+        # border_mode='same'))
 
     model.add(Flatten())
 
@@ -233,7 +233,8 @@ def KerasEyeObserver():
 
     print("Compiling model")
     sgd = SGD(lr=0.0001, decay=1e-6, momentum=0.9, nesterov=True)
-    model.compile(optimizer=sgd, loss='categorical_crossentropy',
+    rms = RMSprop(lr=0.0001)
+    model.compile(optimizer=rms, loss='categorical_crossentropy',
                     metrics=['accuracy'])
 
     try:

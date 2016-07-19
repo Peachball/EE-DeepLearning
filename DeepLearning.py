@@ -87,6 +87,11 @@ def reset(params, init_size=0.1, init_range=None):
         p.set_value(np.random.uniform(low=init_range[0], high=init_range[1],
             size=p.shape.eval()).astype(theano.config.floatX))
 
+def init_weights(shape, init_type='uniform', scale=0.05):
+    if init_type == 'uniform':
+        return np.random.uniform(low=-scale, high=scale, size=shape).astype(
+                theano.config.floatX)
+
 def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
     updates = []
     history = []
@@ -220,6 +225,14 @@ def generateMomentumUpdates(params, error, alpha=0.01, momentum=0.5):
     gradUpdates.update(OrderedDict((m, momentum * m + alpha * g) for m, g in
         zip(mparams, grad)))
     return ([gradUpdates, mparams], gradUpdates)
+
+def generateNesterovMomentumUpdates(params, error, alpha=0.01, momentum=0.9,
+        decay=1e-6):
+    grad = T.grad(error, params)
+    updates = []
+    momentum = []
+    for p in params:
+        pass
 
 def generateRpropUpdates(params, error, init_size=1, verbose=False):
     prevw = []
