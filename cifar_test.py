@@ -26,7 +26,7 @@ def get_data():
     return (X_train, Y_train), (X_test, Y_test)
 
 def kerasTest():
-    from keras.layers import Convolution2D, MaxPooling2D, Dense, Flatten
+    from keras.layers import Convolution2D, MaxPooling2D, Dense, Flatten, Dropout
     from keras.optimizers import SGD
     from keras.models import model_from_yaml
     #Generate model
@@ -36,13 +36,16 @@ def kerasTest():
                         input_shape=(3, 32, 32),))
     model.add(Convolution2D(32, 3, 3, activation='relu', border_mode='same'))
     model.add(MaxPooling2D((2, 2), border_mode='valid'))
+    model.add(Dropout(0.25))
 
     model.add(Convolution2D(64, 3, 3, activation='relu', border_mode='same'))
     model.add(Convolution2D(64, 3, 3, activation='relu', border_mode='same'))
     model.add(MaxPooling2D((2, 2), border_mode='valid'))
+    model.add(Dropout(0.25))
 
     model.add(Flatten())
     model.add(Dense(512, activation='relu'))
+    model.add(Dropout(0.5))
     model.add(Dense(10, activation='softmax'))
 
     #SGD is known to work (just slow af)
@@ -52,7 +55,9 @@ def kerasTest():
         model.load_weights('keras_cifar.h5')
     except Exception as e:
         print("Unable to load previous weights")
-    model.compile(optimizer='adam', loss='categorical_crossentropy',
+
+    #Adam works, but maybe not as well as sgd?
+    model.compile(optimizer=sgd, loss='categorical_crossentropy',
             metrics=['accuracy'])
 
     (x, y), _ = get_data()

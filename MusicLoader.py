@@ -273,7 +273,7 @@ def testConvNet():
     print(finalP.min(), finalP.max())
     print(x.min(), x.max())
 
-def create_examples(x, length=128, examples=None):
+def create_examples(x, length=128, examples=None, uniform=False):
 
     if examples is None:
         examples = x.shape[0] // length
@@ -284,7 +284,12 @@ def create_examples(x, length=128, examples=None):
     y_out = np.zeros((examples, x.shape[1]))
 
     count = 0
-    for i in random.sample(range(x.shape[0] - length), examples):
+    if not uniform:
+        indexes = random.sample(range(x.shape[0] - length, examples))
+    if uniform:
+        indexes = range(0, x.shape[0] - length, length)[:examples]
+
+    for i in indexes:
         x_out[count] = x[i:(i+length)]
         y_out[count] = x[i+length+1]
         count += 1
@@ -296,18 +301,18 @@ def testKerasLSTM():
 
     scale, data = normalize(wav_to_FT(orgdata))
 
-    X_ex, Y_ex = create_examples(data)
-
-
     #Build lstm model
     from keras.models import Sequential
-    from keras.layers import LSTM
+    from keras.layers import LSTM, Dense, TimeDistributed
     from keras.optimizers import RMSprop
 
     model = Sequential()
-    model.add(LSTM(1024, input_dim=1024, return_sequences=False))
+    model.add(TimeDistributed(Dense(1024), input_shape=(128, 1024)))
+    model.add(LSTM(1024, return_sequences=True))
+    model.add(LSTM(1024, return_sequences=True))
+    model.add(LSTM(1024, return_sequences=False))
 
-    model.compile(RMSprop(lr=0.01), 'mse')
+    model.compile(RMSprop(lr=0.001), 'mse')
 
 
     def generateSample(length=150, seed=None):
@@ -326,9 +331,16 @@ def testKerasLSTM():
 
     generateSample.count = 0
 
+    try:
+        model.load_weights("keras_musicgen.h5")
+    except:
+        print("Unable to load weights")
+
     while True:
-        generateSample()
+        X_ex, Y_ex = create_examples(data, uniform=True)
+        generateSample(length=1024)
         model.fit(X_ex, Y_ex)
+        model.save_weights("keras_musicgen.h5", overwrite=True)
 
 
 if __name__ == '__main__':
