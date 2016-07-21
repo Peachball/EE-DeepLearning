@@ -74,9 +74,9 @@ def distributed_test():
         "localhost:2200",
         "localhost:2201",
         ],
-        "ps": [
-        "localhost:2202"
-        ]
+        # "ps": [
+        # "localhost:2202"
+        # ]
         }
         )
 
@@ -100,55 +100,72 @@ def distributed_test():
         print("Defining device variables n stuff")
 
         w = tf.Variable(tf.random_uniform([784, 10], minval=-0.05, maxval=0.05))
-        b = tf.Variable(tf.random_uniform([10], ))
+        b = tf.Variable(tf.random_uniform([10], minval=-0.05, maxval=0.05))
 
         y_ = tf.nn.softmax(tf.matmul(X_image, w) + b)
 
-        cross_entropy = tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(y),
-                                        reduction_indices=[1]))
+        cross_entropy = tf.reduce_mean(-tf.reduce_sum(Y_label * tf.log(y_),
+            reduction_indices=[1]))
+
+        predictions = tf.argmax(y_, 1)
+        actual_val = tf.argmax(Y_label, 1)
+        num_correct = tf.equal(predictions, actual_val)
+
+        accuracy = tf.reduce_mean(tf.cast(num_correct, tf.float32))
+
         train_op = tf.train.GradientDescentOptimizer(0.1).minimize(cross_entropy)
         init_op = tf.initialize_all_variables()
 
         global_step = tf.Variable(0)
 
-    print("Defining supervisor")
-    sv = tf.train.Supervisor(is_chief=(FLAGS.task_index==0),
-                             init_op=init_op,
-                             global_step=global_step)
-
-    print("Done with supervisor")
+    X_data = X_data.reshape(60000, 784)
 
     with tf.Session(server.target) as sess:
         print("session in session")
         sess.run(init_op)
         for i in range(1000):
-            error = sess.run([train_op], feed_dict={X_image: X_data,
-                                                    Y_label: Y_data})
-            print(error)
-            print("Somehting ran!")
+            _, error, acc = sess.run([train_op, cross_entropy, accuracy],
+                    feed_dict={X_image: X_data, Y_label: Y_data})
+            print("Error:", error, "Accuracy", acc)
         print("ey")
 
-    # with sv.managed_session(server.target):
-        # print("Starting managed session")
-        # step = 0
-        # while not sv.should_stop() and step < 100:
-            # print("Training step ran")
-            # sess.run([add_op], feed_dict={a: np.random.rand(21, 10),
-                                          # b: np.random.rand(21, 10)})
-            # step += 1
+def non_distributed():
+    X_data, Y_data = load_mnist()
 
-        # print("Done")
-        # sv.stop()
+    X_image = tf.placeholder(tf.float32, [None, 784])
+    Y_label = tf.placeholder(tf.float32, [None, 10])
 
-    # with tf.device("/job:worker/task:0"):
-        # server0 = tf.constant("Task 0!")
+    print("Defining device variables n stuff")
 
-    # with tf.device("/job:worker/task:1"):
-        # server1 = tf.constant("Task 1!")
+    w = tf.Variable(tf.random_uniform([784, 10], minval=-0.05, maxval=0.05))
+    b = tf.Variable(tf.random_uniform([10], minval=-0.05, maxval=0.05))
 
-    # with tf.Session("grpc://localhost:2202") as sess:
-        # for i in range(10000):
-            # sess.run(server0)
+    y_ = tf.nn.softmax(tf.matmul(X_image, w) + b)
+
+    cross_entropy = tf.reduce_mean(-tf.reduce_sum(Y_label * tf.log(y_),
+        reduction_indices=[1]))
+
+    predictions = tf.argmax(y_, 1)
+    actual_val = tf.argmax(Y_label, 1)
+    num_correct = tf.equal(predictions, actual_val)
+
+    accuracy = tf.reduce_mean(tf.cast(num_correct, tf.float32))
+
+    train_op = tf.train.GradientDescentOptimizer(0.1).minimize(cross_entropy)
+    init_op = tf.initialize_all_variables()
+
+    global_step = tf.Variable(0)
+
+    X_data = X_data.reshape(60000, 784)
+
+    with tf.Session() as sess:
+        print("session in session")
+        sess.run(init_op)
+        for i in range(1000):
+            _, error, acc = sess.run([train_op, cross_entropy, accuracy],
+                    feed_dict={X_image: X_data, Y_label: Y_data})
+            print("Error:", error, "Accuracy", acc)
+        print("ey")
 
 def main(_):
     distributed_test()
