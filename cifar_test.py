@@ -4,6 +4,7 @@ import tensorflow as tf
 from keras.models import Sequential
 import numpy as np
 from DeepLearning import init_weights
+import math
 
 
 def get_data():
@@ -168,7 +169,38 @@ def theanoTest():
             print(err)
 
 def tfTest():
-    pass
+    (X_train, Y_train), _ = get_data()
+    x = tf.placeholder(tf.float32, shape=[None, 3, 32, 32])
+    y_ = tf.placeholder(tf.float32, shape=[None, 10])
+
+    def weight_var(shape):
+        if len(shape) == 4:
+            inp = shape[0] * shape[2] * shape[3] + shape[1] * shape[2] *\
+                        shape[3]
+            scale = math.sqrt(6 / inp)
+        elif len(shape) == 2:
+            inp = shape[0] + shape[1]
+            scale = math.sqrt(2 / inp)
+        elif len(shape) == 1:
+            inp = shape[0]
+            scale = np.sqrt(2 / inp)
+        return tf.Variable(tf.random_uniform(shape, minval=-scale,
+           maxval=scale))
+
+    conv1_1 = weight_var([32, 3, 3, 3])
+    bias1_1 = tf.get_variable("bias1_1", shape=[32])
+    layer = tf.nn.conv2d(x, conv1_1, [1, 1, 1, 1], "SAME",
+                        data_format="NCHW") + bias1_1
+
+
+
+    out = layer
+    saver = tf.train.Saver()
+    init_op = tf.initialize_all_variables()
+
+    with tf.Session() as sess:
+        sess.run(init_op)
+        out.eval({x: X_train})
 
 if __name__ == '__main__':
-    kerasTest()
+    tfTest()
