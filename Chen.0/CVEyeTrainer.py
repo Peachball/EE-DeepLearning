@@ -71,12 +71,12 @@ def distributed_test():
 
     cluster = tf.train.ClusterSpec({"worker": [
         # "192.168.0.207:4000"
-        "localhost:2200",
-        "localhost:2201",
+        "192.168.0.2:2200",
+        "192.168.0.207:2201",
         ],
-        # "ps": [
-        # "localhost:2202"
-        # ]
+        "ps": [
+        "192.168.0.2:2202"
+        ]
         }
         )
 
