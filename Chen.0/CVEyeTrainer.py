@@ -4,7 +4,6 @@ import sys
 import numpy as np
 
 sys.path.append('..')
-# from EyeObserver import *
 
 def eyeTrainer():
 
@@ -70,15 +69,13 @@ def distributed_test():
     c = tf.constant("HI")
 
     cluster = tf.train.ClusterSpec({"worker": [
-        # "192.168.0.207:4000"
-        "192.168.0.2:2200",
-        "192.168.0.2:2201",
+            "98.247.224.66:4000"
+            "71.212.102.252:6969"
         ],
         "ps": [
-        "192.168.0.2:2202"
+            "98.247.224.66:4001"
         ]
-        }
-        )
+        })
 
     args = parser.parse_args()
     if args.server == 0:
