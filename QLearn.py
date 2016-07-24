@@ -360,6 +360,7 @@ def KerasSnake():
     rew = []
     act = []
     nstate = []
+    prev_scores = []
     maxSize = 0
     maxMem = 10000
     draw = False
@@ -392,9 +393,12 @@ def KerasSnake():
         print("Unable to load weights")
 
     while True:
-        moves = 0
-        tooSlow = 0
-        prevMove = -1
+
+        #Play a game
+        moves = 0           #Count the number of moves for net
+        tooSlow = 0         #Maximum number of moves without action before
+                            #program stops
+        prevMove = -1       #Record previous move so that snake doesn't suicide
         while True:
             moves += 1
             bef = np.array(convertBoard(b, style=style)).reshape(1, inputsize)
@@ -432,6 +436,14 @@ def KerasSnake():
             if end:
                 break
         [size, _] = evalSize(b)
+        prev_scores.append(size)
+
+        #Display average score to screen
+        print("Average points:", 1.0 * sum(prev_scores) / len(prev_scores))
+        if len(prev_scores) > 30:
+            del prev_scores[:-30]
+
+        #Display snake to screen (view sample of its ai)
         if size > maxSize and size > 5:
             maxSize = size
             print("Max Size: ", size)
@@ -455,6 +467,8 @@ def KerasSnake():
                 if status > 0:
                     if addApple(board) == 1:
                         break
+
+        #Training code
         if len(mem) > 1000:
             def pickSamples(size=100):
                 if size > len(mem) or size is None or size < 0:
@@ -489,7 +503,7 @@ def KerasSnake():
             a = np.array(a)
             b = np.array(b)
             error = model.train_on_batch(a, b)
-            print(error)
+            print("Error:", error)
             '''
             mem = []
             rew = []
@@ -498,11 +512,15 @@ def KerasSnake():
             '''
             if temp > 0.1:
                 temp *= 0.999
+
+        #Erase the previous memory
         if len(mem) > maxMem:
             del mem[:-maxMem]
             del rew[:-maxMem]
             del act[:-maxMem]
             del nstate[:-maxMem]
+
+        #Restart game
         b = createBoard(boardSize)
         b[0][0] = 1
         addApple(b)

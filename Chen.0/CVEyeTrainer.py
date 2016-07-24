@@ -72,7 +72,7 @@ def distributed_test():
     cluster = tf.train.ClusterSpec({"worker": [
         # "192.168.0.207:4000"
         "192.168.0.2:2200",
-        "192.168.0.207:2201",
+        "192.168.0.2:2201",
         ],
         "ps": [
         "192.168.0.2:2202"
@@ -94,13 +94,15 @@ def distributed_test():
     X_image = tf.placeholder(tf.float32, [None, 784])
     Y_label = tf.placeholder(tf.float32, [None, 10])
 
+    with tf.device("/job:ps/task:0"):
+        w = tf.get_variable("weight_1", shape=[784, 10],
+                initializer=tf.contrib.layers.xavier_initializer())
+        b = tf.get_variable("bias_1", shape=[10])
+
     with tf.device(tf.train.replica_device_setter(
         worker_device="/job:worker/task:%d" % args.server,
         cluster=cluster)):
         print("Defining device variables n stuff")
-
-        w = tf.Variable(tf.random_uniform([784, 10], minval=-0.05, maxval=0.05))
-        b = tf.Variable(tf.random_uniform([10], minval=-0.05, maxval=0.05))
 
         y_ = tf.nn.softmax(tf.matmul(X_image, w) + b)
 
@@ -113,14 +115,27 @@ def distributed_test():
 
         accuracy = tf.reduce_mean(tf.cast(num_correct, tf.float32))
 
-        train_op = tf.train.GradientDescentOptimizer(0.1).minimize(cross_entropy)
-        init_op = tf.initialize_all_variables()
+        train_op = tf.train.AdamOptimizer().minimize(cross_entropy)
+
+        summary_op = tf.merge_all_summaries() #Generate tensorboard info
 
         global_step = tf.Variable(0)
+        saver = tf.train.Saver()
+        init_op = tf.initialize_all_variables()
 
+
+    sv = tf.train.Supervisor(is_chief=(args.server==0),
+                             logdir="/tmp/tf_test_trainlogs",
+                             init_op=init_op,
+                             global_step = global_step,
+                             summary_op = summary_op,
+                             saver=saver,
+                             save_model_secs=10
+                             )
     X_data = X_data.reshape(60000, 784)
 
-    with tf.Session(server.target) as sess:
+    with sv.managed_session(server.target) as sess:
+    # with tf.Session(server.target) as sess:
         print("session in session")
         sess.run(init_op)
         for i in range(1000):

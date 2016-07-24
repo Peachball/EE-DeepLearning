@@ -9,7 +9,8 @@ import math
 
 def get_data():
     from keras.datasets import cifar10
-    (X_train, Y_train), (X_test, Y_test) = cifar10.load_data()
+    from keras.datasets import cifar100
+    (X_train, Y_train), (X_test, Y_test) = cifar100.load_data(label_mode='fine')
 
     def to_categorical(y):
         z = np.zeros((y.shape[0], y.max()+1))
@@ -47,7 +48,7 @@ def kerasTest():
     model.add(Flatten())
     model.add(Dense(512, activation='relu'))
     model.add(Dropout(0.5))
-    model.add(Dense(10, activation='softmax'))
+    model.add(Dense(100, activation='softmax'))
 
     #SGD is known to work (just slow af)
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
@@ -56,6 +57,7 @@ def kerasTest():
         model.load_weights('keras_cifar.h5')
     except Exception as e:
         print("Unable to load previous weights")
+        model.save_weights("keras_cifar.h5", overwrite=True)
 
     #Adam works, but maybe not as well as sgd?
     model.compile(optimizer=sgd, loss='categorical_crossentropy',
@@ -170,13 +172,14 @@ def theanoTest():
 
 def tfTest():
     (X_train, Y_train), _ = get_data()
-    x = tf.placeholder(tf.float32, shape=[None, 3, 32, 32])
-    y_ = tf.placeholder(tf.float32, shape=[None, 10])
+    x = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
+    y_ = tf.placeholder(tf.float32, shape=[None, 100])
 
     def weight_var(shape):
-        if len(shape) == 4:
-            inp = shape[0] * shape[2] * shape[3] + shape[1] * shape[2] *\
-                        shape[3]
+        """Xavier Initalization for a weight var"""
+        if len(shape) == 4:#Filter is [height, width, in_channels, out_channels]
+            inp = shape[2] * shape[0] * shape[1] + shape[3] * shape[0] *\
+                        shape[1]
             scale = math.sqrt(6 / inp)
         elif len(shape) == 2:
             inp = shape[0] + shape[1]
@@ -187,20 +190,22 @@ def tfTest():
         return tf.Variable(tf.random_uniform(shape, minval=-scale,
            maxval=scale))
 
-    conv1_1 = weight_var([32, 3, 3, 3])
-    bias1_1 = tf.get_variable("bias1_1", shape=[32])
-    layer = tf.nn.conv2d(x, conv1_1, [1, 1, 1, 1], "SAME",
-                        data_format="NCHW") + bias1_1
+    conv1_1 = weight_var([3, 3, 3, 32])
+    bias1_1 = tf.Variable(tf.random_uniform([32], minval=-0.05,
+        maxval=0.05), name="bias1_1")
+    layer1_1 = tf.nn.conv2d(x, conv1_1, [1, 1, 1, 1], "SAME") + bias1_1
+
+    conv1_2 = weight_var([3, 3, 32, 32])
 
 
 
-    out = layer
+    out = layer1_1
     saver = tf.train.Saver()
     init_op = tf.initialize_all_variables()
 
     with tf.Session() as sess:
         sess.run(init_op)
-        out.eval({x: X_train})
+        print(out.eval({x: X_train.transpose(0, 2, 3, 1)[:10]}))
 
 if __name__ == '__main__':
     tfTest()

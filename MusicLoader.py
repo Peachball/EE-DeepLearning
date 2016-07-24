@@ -309,7 +309,6 @@ def testKerasLSTM():
     model = Sequential()
     model.add(TimeDistributed(Dense(1024), input_shape=(128, 1024)))
     model.add(LSTM(1024, return_sequences=True))
-    model.add(LSTM(1024, return_sequences=True))
     model.add(LSTM(1024, return_sequences=False))
 
     model.compile(RMSprop(lr=0.001), 'mse')
