@@ -69,7 +69,7 @@ def distributed_test():
     c = tf.constant("HI")
 
     cluster = tf.train.ClusterSpec({"worker": [
-            "98.247.224.66:4000"
+            "98.247.224.66:4000",
             "71.212.102.252:6969"
         ],
         "ps": [
