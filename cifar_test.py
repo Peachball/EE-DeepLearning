@@ -1,7 +1,6 @@
 from __future__ import print_function
 import theano.tensor as T
 import theano
-import tensorflow as tf
 from keras.models import Sequential
 import numpy as np
 from DeepLearning import init_weights
@@ -54,7 +53,7 @@ def kerasTest():
     model.add(Dense(100, activation='softmax'))
 
     #SGD is known to work (just slow af)
-    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=False)
 
     try:
         model.load_weights('keras_cifar.h5')
@@ -310,9 +309,10 @@ def hyperconnection_test():
 
     x = T.tensor4()
     y = T.matrix()
+    params = []
 
-
-    layer1 = T.nn.relu(add_conv_layer(x, (128, 3, 3, 3)))
+    b = get_weight((128,))
+    layer1 = T.nn.relu(add_conv_layer(x, (128, 3, 3, 3), params))
 
 def control_test():
     """
@@ -341,17 +341,17 @@ def control_test():
     layer4 = T.nnet.relu(add_conv_layer(layer3, (128, 128, 3, 3), params))
     # layer4 = T.signal.pool.pool_2d(layer4, (2, 2), ignore_border=True)
 
-    layer5 = T.flatten(layer4)
+    layer5 = T.flatten(layer4, 2)
 
     w = get_weight((2048, 100), params)
     b = get_weight((100,), params)
     layer6 = T.dot(layer5, w) + b
 
-    out = layer6 #T.nnet.softmax(layer6)
+    out = T.nnet.softmax(layer6)
+    predict = theano.function([x], [out])
 
     num_correct = T.sum(T.eq(T.argmax(out, 1), T.argmax(y, 1)))
     cross_entropy = T.mean(T.sum(-y * T.log(out), axis=1))
-    predict = theano.function([x], [out])
 
     alpha = theano.shared(np.array(0.01).astype(theano.config.floatX))
     (storage, updates) = generateMomentumUpdates(params, cross_entropy, alpha,
@@ -367,17 +367,21 @@ def control_test():
 
     X = X_dat
 
-    print(predict(X[:10])[0].shape)
-
     print("Training")
+    epoch = 1
+    import sys
     while True:
+        print("Epoch:", epoch)
+        epoch += 1
         total_cor = 0
         for i in range(0, X.shape[0], 32):
             [loss, cor] = learn(X[i:(i+32)], Y_dat[i:(i+32)])
             total = i + 32
 
             total_cor += cor
-            print("Loss: ", loss, "Accuracy", total_cor * 1.0 / total)
+            print("\rLoss: ", loss, "Accuracy", total_cor * 1.0 / total,
+                    end="")
+            sys.stdout.flush()
 
 if __name__ == '__main__':
-    control_test()
+    kerasTest()
