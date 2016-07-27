@@ -156,7 +156,7 @@ def get_data(noeye=0, nosee=0, see=0):
         count = 0
 
         usable_files = range(len(os.listdir(directory)))
-        if amount > len(usable_files):
+        if amount > len(usable_files) or amount < 0:
             amount = len(usable_files)
 
         usable_files = random.sample(usable_files, amount)
@@ -186,17 +186,19 @@ def get_data(noeye=0, nosee=0, see=0):
 
     return np.array(noeye_dat + nosee_dat + see_dat), np.array(Y_dat)
 
-
 def KerasEyeObserver():
-    X_dat, Y_dat = get_data(noeye=200, nosee=0, see=200)
+    X_dat, Y_dat = get_data(noeye=-1, nosee=-1, see=-1)
+    X_dat = X_dat.astype('float32')
     scale = (256, 128)
     _, X = normalize(X_dat.transpose(0, 3, 1, 2), scaleFactor = scale)
 
-    # count = 0
     # while True:
-        # plt.imshow(X_dat[count], interpolation='none')
+        # import random
+        # count = random.randint(0, X.shape[0] - 1)
+        # plt.imshow(X.transpose(0, 2, 3, 1)[count] * 256 + 128, interpolation='none')
+        # plt.figure()
+        # plt.imshow((255 - X_dat[count]), interpolation='none')
         # plt.show()
-        # count+=1
 
     act = 'relu'
 
@@ -258,6 +260,89 @@ def KerasEyeObserver():
     plt.show()
     print(history.history.keys())
 
+def tfEyeObserver():
+    X_dat, Y_dat = get_data(noeye=-1, nosee=-1, see=-1)
+    X_dat = X_dat.astype('float32') / 128 - 1
+
+    X_dat = X_dat.transpose(0, 2, 1, 3)
+
+    x = tf.placeholder(tf.float32,
+            shape=[None]+list(config['image_dimension']) + [3])
+    y_ = tf.placeholder(tf.float32, shape=[None, 3])
+    tf.image_summary("Input images", x)
+
+    xavier = tf.contrib.layers.xavier_initializer()
+    xavier2d = tf.contrib.layers.xavier_initializer_conv2d()
+    uniform_init = tf.random_uniform_initializer(minval=-0.05, maxval=0.05)
+
+    def add_conv_layer(inp, scope, shape):
+        with tf.variable_scope(scope):
+            filt = tf.get_variable("filter", shape=shape,
+                    initializer=xavier2d)
+            bias = tf.get_variable("bias", shape=[shape[3]],
+                    initializer=uniform_init)
+
+            layer = tf.nn.relu(tf.nn.conv2d(inp, filt, [1, 1, 1, 1], "SAME") + bias)
+        return layer
+
+    def add_dense_layer(inp, scope, shape, activation=tf.nn.relu):
+        with tf.variable_scope(scope):
+            weight = tf.get_variable("weight", shape=shape, initializer=xavier)
+            bias = tf.get_variable('bias', shape=[shape[1]],
+                    initializer=uniform_init)
+            layer = activation(tf.matmul(inp, weight) + bias)
+        return layer
+
+    layer1 = add_conv_layer(x, "conv1", [11, 11, 3, 96])
+
+    layer2_1 = tf.nn.max_pool(layer1, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+
+    layer2 = add_conv_layer(layer2_1, "conv2", [5, 5, 96, 256])
+
+    layer3 = add_conv_layer(layer2, "conv3", [3, 3, 256, 192])
+
+    layer4_1 = tf.nn.max_pool(layer3, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+
+    layer4_2 = tf.reshape(layer4_1, [-1, 176640], name='layer4')
+
+    layer5 = add_dense_layer(layer4_2, "dense5", [176640, 4096]
+            , activation=tf.tanh)
+    layer6 = add_dense_layer(layer5, "dense6", [4096, 4096],
+            activation=tf.tanh)
+
+    layer7 = add_dense_layer(layer5, "dense7", [4096, 3],
+            activation=tf.nn.softmax)
+
+    out = layer7
+
+    cross_entropy = tf.reduce_mean(tf.reduce_sum(-y_ * tf.log(out), 1))
+
+    tf.scalar_summary("Loss over time", cross_entropy)
+
+    num_correct = tf.reduce_sum(tf.cast(tf.equal(tf.argmax(y_, 1),
+        tf.argmax(out, 1)), tf.float32))
+
+    train_op = tf.train.AdamOptimizer().minimize(cross_entropy)
+
+    init_op = tf.initialize_all_variables()
+    summary = tf.merge_all_summaries()
+    writer = tf.train.SummaryWriter('./tfeyetrainer/debug')
+    saver = tf.train.Saver()
+
+    sv = tf.train.Supervisor(init_op=init_op,
+            logdir='./tfeyetrainer/models',
+            saver=saver,
+            summary_op=summary)
+
+    with sv.managed_session() as sess:
+        while True:
+            for i in range(0, X_dat.shape[0], 3):
+                _, loss, cor, summary = sess.run([out, cross_entropy,
+                                                  num_correct, summary_op],
+                                    feed_dict={x: X_dat[:5], y_:Y_dat[:5]})
+
+            writer.add_summary(summary)
+            print(loss, cor)
 
 if __name__=='__main__':
-    KerasEyeObserver()
+    tfEyeObserver()

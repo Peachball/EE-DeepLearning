@@ -299,6 +299,7 @@ def testKerasLSTM():
     #Load data
     orgdata = convertMusicFile(0)
 
+    orgdata = orgdata.astype('float32')
     scale, data = normalize(wav_to_FT(orgdata))
 
     #Build lstm model

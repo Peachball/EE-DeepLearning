@@ -217,22 +217,36 @@ def generateVanillaUpdates(params, error, alpha=0.01):
 
 def generateMomentumUpdates(params, error, alpha=0.01, momentum=0.5):
     grad = []
+    if type(alpha) == float:
+        alpha = theano.shared(np.array(alpha).astype(theano.config.floatX))
+    if type(momentum) == float:
+        momentum = theano.shared(np.array(momentum)
+                                    .astype(theano.config.floatX))
     for p in params:
         grad.append(T.grad(error, p))
     mparams = [theano.shared(np.zeros(p.shape.eval()).astype(theano.config.floatX)) for p in params]
-    gradUpdates = OrderedDict((p, p - g) for p, g in zip(params,mparams))
+    gradUpdates = [(p, p - g) for p, g in zip(params,mparams)]
 
-    gradUpdates.update(OrderedDict((m, momentum * m + alpha * g) for m, g in
-        zip(mparams, grad)))
+    gradUpdates += [(m, momentum * m + alpha * g) for m, g in
+        zip(mparams, grad)]
     return ([gradUpdates, mparams], gradUpdates)
 
 def generateNesterovMomentumUpdates(params, error, alpha=0.01, momentum=0.9,
         decay=1e-6):
-    grad = T.grad(error, params)
+    print("WARNING: NOT FULLY IMPLEMENTED YET")
     updates = []
     momentum = []
     for p in params:
-        pass
+        v_t = theano.shared(np.zeros(p.get_value().shape)
+                .astype(theano.config.floatX))
+        grad = T.grad(error, p + momentum * v_t)
+
+        updates.append((p, p + v_t))
+        updates.append((v_t, momentum * v_t - alpha * grad))
+
+        momentum.append(v_t)
+
+    return (momentum, updates)
 
 def generateRpropUpdates(params, error, init_size=1, verbose=False):
     prevw = []

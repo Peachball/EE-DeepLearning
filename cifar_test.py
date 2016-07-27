@@ -1,3 +1,4 @@
+from __future__ import print_function
 import theano.tensor as T
 import theano
 import tensorflow as tf
@@ -5,6 +6,8 @@ from keras.models import Sequential
 import numpy as np
 from DeepLearning import init_weights
 import math
+import matplotlib.pyplot as plt
+from DeepLearning import *
 
 
 def get_data():
@@ -22,8 +25,8 @@ def get_data():
     Y_test = to_categorical(Y_test)
 
     #Noramlize pixels to [0, 1]
-    X_train /= 255
-    X_test /= 255
+    X_train = X_train.astype('float32') / 255.0
+    X_test = X_test.astype('float32') / 255.0
 
     return (X_train, Y_train), (X_test, Y_test)
 
@@ -65,6 +68,8 @@ def kerasTest():
 
     (x, y), _ = get_data()
 
+
+    print(model.to_json())
 
     while True:
         model.fit(x, y, nb_epoch=10, validation_split=0.2)
@@ -174,8 +179,9 @@ def tfTest():
     (X_train, Y_train), _ = get_data()
     x = tf.placeholder(tf.float32, shape=[None, 32, 32, 3])
     y_ = tf.placeholder(tf.float32, shape=[None, 100])
+    tf.image_summary("Input images", x)
 
-    def weight_var(shape):
+    def weight_var(shape, name=None):
         """Xavier Initalization for a weight var"""
         if len(shape) == 4:#Filter is [height, width, in_channels, out_channels]
             inp = shape[2] * shape[0] * shape[1] + shape[3] * shape[0] *\
@@ -188,24 +194,190 @@ def tfTest():
             inp = shape[0]
             scale = np.sqrt(2 / inp)
         return tf.Variable(tf.random_uniform(shape, minval=-scale,
-           maxval=scale))
+           maxval=scale), name=name)
 
-    conv1_1 = weight_var([3, 3, 3, 32])
+    conv1_1 = weight_var([3, 3, 3, 32], name="conv1_1")
     bias1_1 = tf.Variable(tf.random_uniform([32], minval=-0.05,
         maxval=0.05), name="bias1_1")
-    layer1_1 = tf.nn.conv2d(x, conv1_1, [1, 1, 1, 1], "SAME") + bias1_1
+    layer1_1 = tf.nn.relu(tf.nn.conv2d(x, conv1_1, [1, 1, 1, 1], "SAME") +
+            bias1_1)
 
-    conv1_2 = weight_var([3, 3, 32, 32])
+    conv1_2 = weight_var([3, 3, 32, 32], name='conv1_1')
+    bias1_2 = tf.Variable(tf.random_uniform([32], minval=-0.05, maxval=0.05),
+            name="bias1_1")
+    layer1_2 = tf.nn.relu(tf.nn.conv2d(layer1_1, conv1_2, [1, 1, 1, 1], "SAME") +
+            bias1_2)
 
+    layer2 = tf.nn.max_pool(layer1_2, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
 
+    conv3_1 = weight_var([3, 3, 32, 64], name="conv3_1")
+    bias3_1 = tf.Variable(tf.random_uniform([64], minval=-0.05, maxval=0.05),
+            name="bias3_1")
+    layer3_1 = tf.nn.relu(tf.nn.conv2d(layer2, conv3_1, [1, 1, 1, 1], "SAME") +
+            bias3_1)
 
-    out = layer1_1
+    conv3_2 = weight_var([3, 3, 64, 64], name="conv3_2")
+    bias3_2 = tf.Variable(tf.random_uniform([64], minval=-0.05, maxval=0.05),
+            name="bias3_2")
+    layer3_2 = tf.nn.relu(tf.nn.conv2d(layer3_1, conv3_2, [1, 1, 1, 1], "SAME") +
+            bias3_2)
+
+    layer4 = tf.nn.max_pool(layer3_2, [1, 2, 2, 1], [1, 2, 2, 1], "SAME")
+
+    weight5 = weight_var([4096, 512], name="weight5")
+    bias5 = tf.Variable(tf.random_uniform([512], minval=-0.05, maxval=0.05),
+            name="bias5")
+    layer5 = tf.nn.relu(tf.matmul(tf.reshape(layer4, [-1, 4096]), weight5) +
+            bias5)
+
+    weight6 = weight_var([512, 100], name="weight6")
+    bias6 = tf.Variable(tf.random_uniform([100], minval=-0.05, maxval=0.05),
+            name="bias6")
+    layer6 = tf.nn.softmax(tf.matmul(layer5, weight6) + bias6)
+
+    out = layer6
+    cross_entropy = tf.reduce_mean(tf.reduce_sum(-y_ * tf.log(out),
+        reduction_indices=1))
+
+    tf.scalar_summary("Loss over time", cross_entropy)
+
+    correct = (tf.equal(tf.argmax(out, 1), tf.argmax(y_, 1)))
+    num_correct = tf.reduce_sum(tf.cast(correct, tf.int32))
+    accuracy = tf.reduce_mean(tf.cast(correct, tf.float32))
+
+    global_step = tf.Variable(0.0)
+    alpha = 0.01 / (tf.cast(global_step, tf.float32) * 1e-6 + 1)
+    train_op = tf.train.MomentumOptimizer(alpha, 0.9).minimize(cross_entropy)
     saver = tf.train.Saver()
     init_op = tf.initialize_all_variables()
+    summary = tf.merge_all_summaries()
+    writer = tf.train.SummaryWriter('./tfcifar/cifar_debug/')
+    sv = tf.train.Supervisor(init_op=init_op,
+                             logdir='./tfcifar/cifar_tf_data',
+                             saver=saver,
+                             summary_op=summary)
 
-    with tf.Session() as sess:
-        sess.run(init_op)
-        print(out.eval({x: X_train.transpose(0, 2, 3, 1)[:10]}))
+    with sv.managed_session() as sess:
+        X_train = X_train.transpose(0, 2, 3, 1)
+
+        while True:
+            total = 0
+            for i in range(0, X_train.shape[0], 32):
+                writer.add_graph(sess.graph)
+                _, error, correct, s = sess.run([train_op, cross_entropy,
+                    num_correct, summary],
+                    feed_dict={x: X_train[i:(i+32)],
+                        y_: Y_train[i:(i+32)]})
+                writer.add_summary(s)
+                total += correct
+                print(error, (total * 1.0 / (i+32)))
+
+
+def get_weight(shape, params=None):
+    if len(shape) == 4:
+        scale = np.sqrt(6.0) / (shape[1] * shape[2] * shape[3])
+    if len(shape) == 2:
+        scale = np.sqrt(6.0) / (shape[0] + shape[1])
+    if len(shape) == 1:
+        scale = 0.05
+
+    var = theano.shared(np.random.uniform(low=-scale, high=scale,
+        size=shape).astype(theano.config.floatX))
+
+    if not params is None:
+        params.append(var)
+
+    return var
+
+def add_conv_layer(inp, shape, params):
+    filt = get_weight(shape)
+    bias = get_weight((shape[0],))
+    conv = T.nnet.conv2d(inp, filt, border_mode='half')
+
+    layer = conv + bias.dimshuffle('x', 0, 'x', 'x')
+
+    params += [filt, bias]
+    return layer
+
+
+def hyperconnection_test():
+    """
+        4 Layer hyperconnected convolution network to be tested against
+        cifar100
+    """
+
+    theano.config.floatX = 'float32'
+
+    x = T.tensor4()
+    y = T.matrix()
+
+
+    layer1 = T.nn.relu(add_conv_layer(x, (128, 3, 3, 3)))
+
+def control_test():
+    """
+        4 Layer standard conv net with 128 channels and 3x3 filters all the way
+        through
+
+        Max pooling between each set of filters
+    """
+
+    theano.config.floatX = 'float32'
+
+    x = T.tensor4() #Size: (batches, 3, 32, 32)
+    y = T.matrix()
+
+    params = []
+
+    layer1 = T.nnet.relu(add_conv_layer(x, (128, 3, 3, 3), params))
+    layer1 = T.signal.pool.pool_2d(layer1, (2, 2), ignore_border=True)
+
+    layer2 = T.nnet.relu(add_conv_layer(layer1, (128, 128, 3, 3), params))
+    layer2 = T.signal.pool.pool_2d(layer2, (2, 2), ignore_border=True)
+
+    layer3 = T.nnet.relu(add_conv_layer(layer2, (128, 128, 3, 3), params))
+    layer3 = T.signal.pool.pool_2d(layer3, (2, 2), ignore_border=True)
+
+    layer4 = T.nnet.relu(add_conv_layer(layer3, (128, 128, 3, 3), params))
+    # layer4 = T.signal.pool.pool_2d(layer4, (2, 2), ignore_border=True)
+
+    layer5 = T.flatten(layer4)
+
+    w = get_weight((2048, 100), params)
+    b = get_weight((100,), params)
+    layer6 = T.dot(layer5, w) + b
+
+    out = layer6 #T.nnet.softmax(layer6)
+
+    num_correct = T.sum(T.eq(T.argmax(out, 1), T.argmax(y, 1)))
+    cross_entropy = T.mean(T.sum(-y * T.log(out), axis=1))
+    predict = theano.function([x], [out])
+
+    alpha = theano.shared(np.array(0.01).astype(theano.config.floatX))
+    (storage, updates) = generateMomentumUpdates(params, cross_entropy, alpha,
+            0.9)
+    updates.append((alpha, alpha / (1 + 1e-6)))
+
+    learn = theano.function([x, y], [cross_entropy, num_correct],
+            updates=updates, allow_input_downcast=True)
+
+
+    print("Loading data")
+    (X_dat, Y_dat), _ = get_data()
+
+    X = X_dat
+
+    print(predict(X[:10])[0].shape)
+
+    print("Training")
+    while True:
+        total_cor = 0
+        for i in range(0, X.shape[0], 32):
+            [loss, cor] = learn(X[i:(i+32)], Y_dat[i:(i+32)])
+            total = i + 32
+
+            total_cor += cor
+            print("Loss: ", loss, "Accuracy", total_cor * 1.0 / total)
 
 if __name__ == '__main__':
-    tfTest()
+    control_test()
