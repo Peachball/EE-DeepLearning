@@ -37,7 +37,7 @@ def kerasTest():
     model = Sequential()
 
     model.add(Convolution2D(32, 3, 3, activation='relu', border_mode='same',
-                        input_shape=(3, 32, 32),))
+                        input_shape=(3, 32, 32)))
     model.add(Convolution2D(32, 3, 3, activation='relu', border_mode='same'))
     model.add(MaxPooling2D((2, 2), border_mode='valid'))
     model.add(Dropout(0.25))
@@ -55,11 +55,11 @@ def kerasTest():
     #SGD is known to work (just slow af)
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=False)
 
-    try:
-        model.load_weights('keras_cifar.h5')
-    except Exception as e:
-        print("Unable to load previous weights")
-        model.save_weights("keras_cifar.h5", overwrite=True)
+    # try:
+        # model.load_weights('keras_cifar.h5')
+    # except Exception as e:
+        # print("Unable to load previous weights")
+        # model.save_weights("keras_cifar.h5", overwrite=True)
 
     #Adam works, but maybe not as well as sgd?
     model.compile(optimizer=sgd, loss='categorical_crossentropy',
@@ -67,14 +67,11 @@ def kerasTest():
 
     (x, y), _ = get_data()
 
-
-    print(model.to_json())
-
     while True:
         model.fit(x, y, nb_epoch=10, validation_split=0.2)
 
         #Save model and weights
-        model.save_weights("keras_cifar.h5", overwrite=True)
+        # model.save_weights("keras_cifar.h5", overwrite=True)
 
 def theanoTest():
     theano.config.floatX = 'float32'
@@ -288,14 +285,21 @@ def get_weight(shape, params=None):
 
     return var
 
-def add_conv_layer(inp, shape, params):
+def add_conv_layer(inp, shape, params, bias=True):
     filt = get_weight(shape)
-    bias = get_weight((shape[0],))
+    if bias:
+        bias = get_weight((shape[0],))
     conv = T.nnet.conv2d(inp, filt, border_mode='half')
 
-    layer = conv + bias.dimshuffle('x', 0, 'x', 'x')
+    if bias:
+        layer = conv + bias.dimshuffle('x', 0, 'x', 'x')
+    else:
+        layer = conv
 
-    params += [filt, bias]
+    if bias:
+        params += [filt, bias]
+    else:
+        params += [filt]
     return layer
 
 
@@ -312,7 +316,118 @@ def hyperconnection_test():
     params = []
 
     b = get_weight((128,))
-    layer1 = T.nn.relu(add_conv_layer(x, (128, 3, 3, 3), params))
+
+    layer1 = T.nnet.relu(add_conv_layer(x, (128, 3, 3, 3), params))
+    layer1 = T.signal.pool.pool_2d(layer1, (2, 2), ignore_border=True)
+
+    def get_adj_inp(sample_size):
+        return T.signal.pool.pool_2d(add_conv_layer(x, (128, 3, 1, 1), params),
+                sample_size, ignore_border=True)
+    cur_layers = [layer1]
+
+    layer2 = get_adj_inp((2, 2))
+
+    for l in cur_layers:
+        layer2 = layer2 + add_conv_layer(l, (128, 128, 3, 3), params,
+                bias=False)
+
+    layer2 = T.nnet.relu(layer2)
+    layer2 = T.signal.pool.pool_2d(layer2, (2, 2), ignore_border=True)
+
+    cur_layers = [T.signal.pool.pool_2d(l, (2, 2), ignore_border=True) for l in
+            cur_layers]
+
+    cur_layers.append(layer2)
+
+    layer3 = get_adj_inp((4, 4))
+
+    for l in cur_layers:
+        layer3 = layer3 + add_conv_layer(l, (128, 128, 3, 3), params,
+                bias=False)
+    layer3 = T.nnet.relu(layer3)
+    layer3 = T.signal.pool.pool_2d(layer3, (2, 2), ignore_border=True)
+
+    cur_layers = [T.signal.pool.pool_2d(l, (2, 2), ignore_border=True) for l in
+            cur_layers]
+
+    cur_layers.append(layer3)
+
+    layer4 = get_adj_inp((8, 8))
+    for l in cur_layers:
+        layer4 = layer4 + add_conv_layer(l, (128, 128, 3, 3), params,
+                bias=False)
+
+    layer4 = T.nnet.relu(layer4)
+
+    w = get_weight((2048, 100), params)
+    b = get_weight((100,), params)
+    out = T.nnet.softmax(T.dot(T.flatten(layer4, 2), w) + b)
+
+    predict = theano.function([x], out)
+
+    num_correct = T.sum(T.eq(T.argmax(out, 1), T.argmax(y, 1)))
+
+    cross_entropy = T.mean(T.sum(-y * T.log(T.maximum(out, 1e-20)), 1))
+
+    print("Loading weights")
+
+    (X, Y), _ = get_data()
+
+    (sto, updates) = generateMomentumUpdates(params, cross_entropy, 0.01, 0.9)
+    learn = theano.function([x, y], [num_correct, cross_entropy],
+            allow_input_downcast=True, updates=updates)
+
+    import sys
+
+    def save():
+        saveParams(params, open("hyperconnection_test.npz", "wb"))
+
+    def load():
+        loadParams(params, open('hyperconnection_test.npz', 'rb'))
+
+    load()
+
+    epoch = 0
+    while True:
+        total_cor = 0
+        epoch += 1
+        print("Epoch:", epoch)
+        for i in range(0, X.shape[0], 32):
+            [cor, loss] = learn(X[i:(i+32)], Y[i:(i+32)])
+
+            total_cor += cor
+            accuracy = total_cor * 1.0 / (i + 32)
+
+            print("\rAccuracy:", accuracy, "Loss:", loss, i, end="")
+            sys.stdout.flush()
+        print("")
+        save()
+
+def keras_control_test():
+    from keras.layers import Dense, Convolution2D, MaxPooling2D, Flatten
+    from keras.models import Sequential
+    from keras.optimizers import SGD
+
+    model = Sequential()
+    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same',
+        input_shape=(3, 32, 32)))
+    model.add(MaxPooling2D((2, 2), border_mode='same'))
+    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
+    model.add(MaxPooling2D((2, 2), border_mode='same'))
+    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
+    model.add(MaxPooling2D((2, 2), border_mode='same'))
+    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
+
+    model.add(Flatten())
+
+    model.add(Dense(100, activation='softmax'))
+
+    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=False)
+    model.compile(optimizer='sgd', loss='categorical_crossentropy',
+                metrics=['accuracy'])
+
+    (X_dat, Y_dat), _ = get_data()
+    model.fit(X_dat, Y_dat)
 
 def control_test():
     """
@@ -353,13 +468,14 @@ def control_test():
     num_correct = T.sum(T.eq(T.argmax(out, 1), T.argmax(y, 1)))
     cross_entropy = T.mean(T.sum(-y * T.log(out), axis=1))
 
-    alpha = theano.shared(np.array(0.01).astype(theano.config.floatX))
-    (storage, updates) = generateMomentumUpdates(params, cross_entropy, alpha,
-            0.9)
-    updates.append((alpha, alpha / (1 + 1e-6)))
+    alpha = theano.shared(np.array(0.001).astype(theano.config.floatX))
+    (storage, updates) = generateAdam(params, cross_entropy, alpha)
+    updates.append((alpha, alpha / (1 + 1e-7)))
 
     learn = theano.function([x, y], [cross_entropy, num_correct],
             updates=updates, allow_input_downcast=True)
+
+    print(params)
 
 
     print("Loading data")
@@ -379,9 +495,10 @@ def control_test():
             total = i + 32
 
             total_cor += cor
-            print("\rLoss: ", loss, "Accuracy", total_cor * 1.0 / total,
-                    end="")
+            print("\rLoss: ", loss, "Accuracy", total_cor * 1.0 / total, i,
+                        end="")
             sys.stdout.flush()
+        print("")
 
 if __name__ == '__main__':
-    kerasTest()
+    hyperconnection_test()

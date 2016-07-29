@@ -146,7 +146,9 @@ def generateAdam(params, error, alpha=0.001, decay1=0.9, decay2=0.999,
     updates = []
     moment = []
     vector = []
-    alpha = theano.shared(np.array(alpha).astype(theano.config.floatX))
+
+    if type(alpha) == 'float':
+        alpha = theano.shared(np.array(alpha).astype(theano.config.floatX))
     time = theano.shared(np.array(1.0).astype(theano.config.floatX))
     epsilon = theano.shared(np.array(epsilon).astype(theano.config.floatX))
     updates.append((time, time+1))
