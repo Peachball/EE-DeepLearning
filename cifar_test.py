@@ -412,8 +412,12 @@ def keras_control_test():
     model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same',
         input_shape=(3, 32, 32)))
     model.add(MaxPooling2D((2, 2), border_mode='same'))
+
+    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
     model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
     model.add(MaxPooling2D((2, 2), border_mode='same'))
+
+    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
     model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
     model.add(MaxPooling2D((2, 2), border_mode='same'))
     model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
@@ -422,12 +426,21 @@ def keras_control_test():
 
     model.add(Dense(100, activation='softmax'))
 
-    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=False)
+    sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
     model.compile(optimizer='sgd', loss='categorical_crossentropy',
                 metrics=['accuracy'])
 
     (X_dat, Y_dat), _ = get_data()
-    model.fit(X_dat, Y_dat)
+
+    try:
+        model.load_weights('6layertest.h5')
+    except Exception as e:
+        print("Unable to load previous weights")
+
+    while True:
+        model.save_weights('6layertest.h5', overwrite=True)
+        model.fit(X_dat, Y_dat, nb_epoch=1)
+
 
 def control_test():
     """
@@ -501,4 +514,4 @@ def control_test():
         print("")
 
 if __name__ == '__main__':
-    hyperconnection_test()
+    keras_control_test()
