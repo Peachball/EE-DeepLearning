@@ -87,10 +87,34 @@ def reset(params, init_size=0.1, init_range=None):
         p.set_value(np.random.uniform(low=init_range[0], high=init_range[1],
             size=p.shape.eval()).astype(theano.config.floatX))
 
-def init_weights(shape, init_type='uniform', scale=0.05):
+def init_weights(shape, init_type='uniform', scale=-1):
     if init_type == 'uniform':
-        return np.random.uniform(low=-scale, high=scale, size=shape).astype(
-                theano.config.floatX)
+        DEFAULT_SCALE = 0.05
+        if scale < 0:
+            scale = DEFAULT_SCALE
+        return np.random.uniform(low=-scale, high=scale, size=shape)
+                .astype(theano.config.floatX)
+
+    if init_type == 'xavier':
+        DEFAULT_SCALE = 6
+        in_neurons = 0
+        out_neurons = 0
+
+        if scale < 0:
+            scale = DEFAULT_SCALE
+        if len(shape) == 2:
+            in_neurons = shape[0]
+            out_neurons = shape[1]
+
+        #Convolution: [output_channels, input_channels, rows, columns]
+        if len(shape) == 4:
+            in_neurons = shape[1] * shape[2] * shape[3]
+            out_neurons = shape[0] * shape[2] * shape[3]
+
+        s = np.sqrt(scale * 1.0 / (in_neurons + out_neurons))
+
+        return np.random.uniform(low=-s, high=s, size=shape)
+                .astype(theano.config.floatX)
 
 def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
     updates = []
