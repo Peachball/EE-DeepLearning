@@ -342,6 +342,27 @@ def testKerasLSTM():
         model.fit(X_ex, Y_ex)
         model.save_weights("keras_musicgen.h5", overwrite=True)
 
+def EEDataGenerator():
+    #Build models
+    def construct_model(layers, m_type='lstm'):
+        x = T.matrix()
+        y = T.matrix()
+
+        if m_type == 'lstm':
+            out = LSTMLayer(1024, 1024)
+        if m_type == 'rnn':
+            pass
+
+        if m_type == 'overlapping_lstm':
+            pass
+
+    #Test lstms
+
+    #Test RNNs
+
+    #Test overlapping LSTMs
+
+    #Test overlapping RNNs
 
 if __name__ == '__main__':
     testKerasLSTM()
