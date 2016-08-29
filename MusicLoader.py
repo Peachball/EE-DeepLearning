@@ -342,6 +342,15 @@ def testKerasLSTM():
         model.fit(X_ex, Y_ex)
         model.save_weights("keras_musicgen.h5", overwrite=True)
 
+def get_data(index):
+    od = convertMusicFile(index)
+    od = od.astype('float32')
+    od = od / 65535 #Assuming 16 bit audio
+
+    data = wav_to_FT(od)
+
+    return data
+
 def EEDataGenerator():
     #Build models
     def construct_model(layers, m_type='lstm'):
@@ -349,14 +358,45 @@ def EEDataGenerator():
         y = T.matrix()
 
         if m_type == 'lstm':
-            out = LSTMLayer(1024, 1024)
+            model = LSTM((1024,) * (layers + 1), out_type='linear', init_size=6)
+            out = model.out
+
         if m_type == 'rnn':
             pass
 
         if m_type == 'overlapping_lstm':
             pass
 
+        return (x, y, model, out)
+
+    X_dat = get_data(0)
+    Y_dat = X_dat[1:]
+
     #Test lstms
+    for i in range(3):
+        print("Constructing " + str(i+1) + " layer lstm")
+        x, y, m, o = construct_model(i+1, m_type='lstm')
+        error = T.mean(T.sqr(y - o))
+        predict = m.predict
+
+        print("Calculating Gradient Updates...")
+        (_, learn_updates) = generateRmsProp(error, lstm.params, alpha=0.01,
+                verbose=True)
+        learn = theano.function([x, y], error, updates=learn_updates)
+
+        def save():
+            saveParams(m.params,"LSTM_"+str(i+1)+"layer.npz", 'wb')
+            return
+
+        def load():
+            loadParams(m.params, "LSTM_" + str(i+1) + "layer.npz")
+            return
+
+        print("Testing save function")
+        save()
+
+        train_error = miniRecurrentLearning(X_dat, Y_dat, learn, predict,
+                verbose=True, epochs=5, save=save, saveiters=100)
 
     #Test RNNs
 
@@ -365,4 +405,4 @@ def EEDataGenerator():
     #Test overlapping RNNs
 
 if __name__ == '__main__':
-    testKerasLSTM()
+    EEDataGenerator()

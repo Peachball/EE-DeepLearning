@@ -77,9 +77,9 @@ class LSTMLayer:
     '''
         This assumes that in this recurrent net, there is a corresponding output to each input
     '''
-    def __init__(self, in_size, out_size, cell_size=None, init_size=0.01,
+    def __init__(self, in_size, out_size, cell_size=None, init_size=-1,
             out_type='sigmoid', in_var=None, out_var=None, verbose=False,
-            mem_bias=5):
+            mem_bias=5, initialization_type='xavier'):
         if cell_size == None:
             cell_size = max(in_size, out_size)
         self.in_size = in_size
@@ -98,81 +98,57 @@ class LSTMLayer:
             print('Constants have been initalized')
 
         #Forget gate
-        self.W_xf = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(in_size, cell_size)).astype(theano.config.floatX))
-        self.b_f= theano.shared(
-                value=np.random.uniform(low=-init_size,
-                    high=init_size, size=(1, cell_size))
-                .astype(theano.config.floatX))
-        self.W_cf = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(cell_size, cell_size)).astype(theano.config.floatX))
-        self.W_hf = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(out_size, cell_size)).astype(theano.config.floatX))
+        self.W_xf = init_weights((in_size, cell_size),
+                init_type=initialization_type, scale=init_size)
+        self.b_f = init_weights((1, cell_size),
+                init_type=initialization_type, scale=init_size)
+        self.W_cf = init_weights((cell_size, cell_size),
+                init_type=initialization_type, scale=init_size)
+        self.W_hf = init_weights((out_size, cell_size),
+                init_type=initialization_type, scale=init_size)
 
 #        forget = T.nnet.sigmoid(T.dot(self.h, self.W_hf) + T.dot(self.C, self.W_cf) + T.dot(self.x, self.W_xf) + self.b_f)
 
         #Memories
-        self.W_hm = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(out_size, cell_size)).astype(theano.config.floatX))
-        self.W_xm = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(in_size, cell_size)).astype(theano.config.floatX))
-        self.b_m = theano.shared(
-                value=np.random.uniform(low=-init_size+large_bias,
-                    high=init_size+large_bias, size=(1, cell_size))
-                .astype(theano.config.floatX))
+        self.W_hm = init_weights((out_size, cell_size),
+                init_type=initialization_type, scale=init_size)
+        self.W_xm = init_weights((in_size, cell_size),
+                init_type=initialization_type, scale=init_size)
+        self.b_m = init_weights((1, cell_size),
+                init_type=initialization_type, scale=init_size)
 
 #        memories = T.tanh(T.dot(self.h, self.W_hm) + T.dot(self.x, self.W_xm) + self.b_m)
         #Remember Gate
-        self.W_hr = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(out_size, cell_size)).astype(theano.config.floatX))
-        self.W_xr = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(in_size, cell_size)).astype(theano.config.floatX))
-        self.W_cr = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(cell_size, cell_size)).astype(theano.config.floatX))
-        self.b_r = theano.shared(
-                value=np.random.uniform(low=-init_size+large_bias,
-                    high=init_size+large_bias,
-                    size=(1, cell_size)).astype(theano.config.floatX))
+        self.W_hr = init_weights((out_size, cell_size),
+                init_type=initialization_type, scale=init_size)
+        self.W_xr = init_weights((in_size, cell_size),
+                init_type=initialization_type, scale=init_size)
+        self.W_cr = init_weights((cell_size, cell_size),
+                init_type=initialization_type, scale=init_size)
+        self.b_r = init_weights((1, cell_size), init_type=initialization_type,
+                scale=init_size)
 
 #        remember = T.nnet.sigmoid(T.dot(self.h, self.W_hr) + T.dot(self.C, self.W_cr) + T.dot(self.x, self.W_xr) + self.b_r)
 
         #Output
-        self.W_co = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(cell_size, out_size)).astype(theano.config.floatX))
-        self.W_ho = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(out_size, out_size)).astype(theano.config.floatX))
-        self.W_xo = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(in_size, out_size)).astype(theano.config.floatX))
-        self.b_o = theano.shared(
-                value=np.random.uniform(
-                    low=-init_size, high=init_size,
-                    size=(1, out_size)).astype(theano.config.floatX))
+        self.W_co = init_weights((cell_size, out_size),
+                init_type=initialization_type, scale=init_size)
+        self.W_ho = init_weights((out_size, out_size),
+                init_type=initialization_type, scale=init_size)
+        self.W_xo = init_weights((in_size, out_size),
+                init_type=initialization_type, scale=init_size)
+        self.b_o = init_weights((1, out_size), init_type=initialization_type,
+                scale=init_size)
 
         #Hidden
-        self.W_ch = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(cell_size, out_size)).astype(theano.config.floatX))
-        self.W_hh = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(out_size, out_size)).astype(theano.config.floatX))
-        self.W_xh = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(in_size, out_size)).astype(theano.config.floatX))
-        self.b_h = theano.shared(
-                value=np.random.uniform(
-                    low=-init_size+large_bias, high=init_size+large_bias,
-                    size=(1, out_size)).astype(theano.config.floatX))
+        self.W_ch = init_weights((cell_size, out_size),
+                init_type=initialization_type, scale=init_size)
+        self.W_hh = init_weights((out_size, out_size),
+                init_type=initialization_type, scale=init_size)
+        self.W_xh = init_weights((in_size, out_size),
+                init_type=initialization_type, scale=init_size)
+        self.b_h = init_weights((1, out_size), init_type=initialization_type,
+                scale=init_size)
 
         self.params = [self.W_xf, self.W_hf, self.W_cf, self.b_f, self.W_hm, self.W_xm, self.b_m,
                 self.W_hr, self.W_cr, self.W_xr, self.b_r, self.W_co, self.W_ho,
@@ -270,6 +246,7 @@ class LSTM():
         self.predict = theano.function([x], prediction, updates=layerUpdates
                 ,allow_input_downcast=True)
         self.out = prediction
+        self.updates = layerUpdates
 
         if verbose:
             print('Defining error')
@@ -316,7 +293,7 @@ class LSTM():
 
 
 def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
-        epochs=1, miniepochs=10, save=None, saveiters=None):
+        epochs=1, miniepochs=1, save=None, saveiters=None):
     """
     Train model on parts of a time series at a time
     e.g. given time seires : 1, 2, 3, 4, 5, 6

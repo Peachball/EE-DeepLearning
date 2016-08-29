@@ -92,8 +92,8 @@ def init_weights(shape, init_type='uniform', scale=-1):
         DEFAULT_SCALE = 0.05
         if scale < 0:
             scale = DEFAULT_SCALE
-        return np.random.uniform(low=-scale, high=scale, size=shape)
-                .astype(theano.config.floatX)
+        return np.random.uniform(low=-scale, high=scale, size=shape).astype(
+                theano.config.floatX)
 
     if init_type == 'xavier':
         DEFAULT_SCALE = 6
@@ -113,8 +113,8 @@ def init_weights(shape, init_type='uniform', scale=-1):
 
         s = np.sqrt(scale * 1.0 / (in_neurons + out_neurons))
 
-        return np.random.uniform(low=-s, high=s, size=shape)
-                .astype(theano.config.floatX)
+        return np.random.uniform(low=-s, high=s, size=shape).astype(
+                theano.config.floatX)
 
 def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
     updates = []
@@ -556,6 +556,10 @@ def miniBatchLearning(x, y, batchSize, updateFunction, verbose=False, epochs=1):
     return train_error
 
 def saveParams(params, f):
+    """
+        params is a list of theano shared variables
+        f is a file name or actual file
+    """
     print("Saving...Do not close")
     arr = []
     for p in params:
