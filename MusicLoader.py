@@ -345,23 +345,26 @@ def testKerasLSTM():
 def get_data(index):
     od = convertMusicFile(index)
     od = od.astype('float32')
-    od = od / 65535 #Assuming 16 bit audio
 
     data = wav_to_FT(od)
-
-    return data
+    scale, data = normalize(data)
+    return scale, data
 
 def EEDataGenerator():
     #Build models
+    MODE = 'FAST_RUN'
     def construct_model(layers, m_type='lstm'):
         x = T.matrix()
         y = T.matrix()
 
         if m_type == 'lstm':
-            model = LSTM((1024,) * (layers + 1), out_type='linear', init_size=6)
+            model = LSTM(*((1024,) * (layers + 1)), in_var=x, out_var=y,
+                    out_type='linear', init_size=6)
             out = model.out
 
         if m_type == 'rnn':
+            model = RNN(*((1024,) * (layers + 1)), in_var=x, out_var=y,
+                    out_type='linear', init_size=6)
             pass
 
         if m_type == 'overlapping_lstm':
@@ -369,23 +372,25 @@ def EEDataGenerator():
 
         return (x, y, model, out)
 
-    X_dat = get_data(0)
-    Y_dat = X_dat[1:]
+    scale, X_dat = get_data(0)
+    X_dat = X_dat[:1024]
+    Y_dat = X_dat[:1024]
 
     #Test lstms
     for i in range(3):
         print("Constructing " + str(i+1) + " layer lstm")
         x, y, m, o = construct_model(i+1, m_type='lstm')
-        error = T.mean(T.sqr(y - o))
+        error = T.mean(T.sum(T.sqr(y - o), axis=1))
         predict = m.predict
 
         print("Calculating Gradient Updates...")
-        (_, learn_updates) = generateRmsProp(error, lstm.params, alpha=0.01,
+        (_, learn_updates) = generateRmsProp(m.params, error, alpha=0.01,
                 verbose=True)
-        learn = theano.function([x, y], error, updates=learn_updates)
+        print("Compiling Learn Function")
+        learn = theano.function([x, y], error, updates=learn_updates, mode=MODE)
 
         def save():
-            saveParams(m.params,"LSTM_"+str(i+1)+"layer.npz", 'wb')
+            saveParams(m.params, "LSTM_"+str(i+1)+"layer.npz")
             return
 
         def load():
@@ -395,10 +400,20 @@ def EEDataGenerator():
         print("Testing save function")
         save()
 
-        train_error = miniRecurrentLearning(X_dat, Y_dat, learn, predict,
+        print("Testing load function")
+        load()
+
+        print("Beginning Training!")
+        train_error = miniRecurrentLearning(X_dat, Y_dat, 20, learn, predict,
                 verbose=True, epochs=5, save=save, saveiters=100)
 
+        pickle.dump(train_error, open(str(i+1) + 'layer_lstm.data', 'wb'))
+
+
     #Test RNNs
+    for i in range(3):
+        print("Constructing " + str(i+1) + " layer rnn")
+        x, y, m, o = construct_model(i+1, m_type='rnn')
 
     #Test overlapping LSTMs
 

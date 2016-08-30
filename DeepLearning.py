@@ -87,13 +87,19 @@ def reset(params, init_size=0.1, init_range=None):
         p.set_value(np.random.uniform(low=init_range[0], high=init_range[1],
             size=p.shape.eval()).astype(theano.config.floatX))
 
-def init_weights(shape, init_type='uniform', scale=-1):
+def init_weights(shape, init_type='uniform', scale=-1, shared_var=True):
     if init_type == 'uniform':
         DEFAULT_SCALE = 0.05
         if scale < 0:
             scale = DEFAULT_SCALE
         return np.random.uniform(low=-scale, high=scale, size=shape).astype(
                 theano.config.floatX)
+
+    if init_type == 'bias':
+        DEFAULT_SCALE = 1
+
+        if scale < 0:
+            scale = DEFAULT_SCALE
 
     if init_type == 'xavier':
         DEFAULT_SCALE = 6
@@ -102,6 +108,13 @@ def init_weights(shape, init_type='uniform', scale=-1):
 
         if scale < 0:
             scale = DEFAULT_SCALE
+
+        if len(shape) == 1:
+            # Shape 1 means that it is bias, therefore the initialization
+            # doesn't really matter
+            in_neurons = 400 #To get s approx. eq. to 0.05
+            out_neurons = 0
+            scale = 1
         if len(shape) == 2:
             in_neurons = shape[0]
             out_neurons = shape[1]
@@ -113,8 +126,13 @@ def init_weights(shape, init_type='uniform', scale=-1):
 
         s = np.sqrt(scale * 1.0 / (in_neurons + out_neurons))
 
-        return np.random.uniform(low=-s, high=s, size=shape).astype(
-                theano.config.floatX)
+        if not shared_var:
+            return np.random.uniform(low=-s, high=s, size=shape).astype(
+                    theano.config.floatX)
+        else:
+            return theano.shared(np.random.uniform(low=-s, high=s,
+                size=shape).astype(theano.config.floatX))
+
 
 def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
     updates = []
@@ -713,7 +731,7 @@ def normalize(x, dim=0, default=1, mean=0, scaleFactor=None):
     if scaleFactor == None:
         means = np.mean(x, axis=dim)
 
-        maxes = np.max(x - means, axis=dim)
+        maxes = np.max(np.abs(x - means), axis=dim)
         maxes[maxes==0] = default
 
         maxes = np.expand_dims(maxes, axis=dim)

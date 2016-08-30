@@ -16,26 +16,21 @@ class RecurrentLayer:
         if hidden_size == None:
             hidden_size = max(in_size, out_size)
 
-        w_io = theano.shared(value=np.random.uniform(
-            low=-init_size, high=init_size, size=(in_size, out_size))
-            .astype(theano.config.floatX))
+        w_io = init_weights((in_size, out_size), init_type='xavier',
+                init_size=init_size)
 
-        w_ih = theano.shared(value=np.random.uniform(
-            low=-init_size, high=init_size, size=(in_size, hidden_size))
-            .astype(theano.config.floatX))
+        w_ih = init_weights((in_size, hidden_size),
+        init_type='xavier', init_size=init_size)
 
-        w_hh = theano.shared(value=np.random.uniform(
-            low=-init_size, high=init_size, size=(hidden_size, hidden_size))
-            .astype(theano.config.floatX))
-        b_h = theano.shared(value=np.random.uniform(
-            low=-init_size, high=init_size, size=(hidden_size))
-            .astype(theano.config.floatX))
+        w_hh = init_weights((hidden_size, hidden_size),
+                init_type='xavier', init_size=init_size)
+        b_h = init_weights((hidden_size), init_type='xavier',
+                init_size=init_size)
 
-        w_ho = theano.shared(value=np.random.uniform(low=-init_size, high=init_size,
-            size=(hidden_size, out_size)).astype(theano.config.floatX))
-        b_o = theano.shared(value=np.random.uniform(
-            low=-init_size, high=init_size, size=(out_size))
-            .astype(theano.config.floatX))
+        w_ho = init_weights((hidden_size, out_size),
+                init_type='xavier', init_size=init_size)
+        b_o = init_weights((out_size), init_type='xavier',
+                init_size=init_size)
 
         self.hidden = theano.shared(
                 value=np.zeros((hidden_size)).astype(theano.config.floatX))
@@ -62,16 +57,61 @@ class RNN:
         init_size = kwargs.get('init_size', 0.01)
         verbose = kwargs.get('verbose', False)
 
-        x = T.matrix("input")
+        x = kwargs.get('in_var', T.matrix("input"))
+        y = kwargs.get('out_var', T.matrix('output'))
         layers = []
         layers.append(RecurrentLayer(dim[0], dim[1], init_size = init_size, in_var=x))
+        out_type = kwargs.get('out_type', 'sigmoid')
 
+        nonlinearity = T.nnet.sigmoid
         for i in range(1, len(dim) -1):
+            if i == len(dim) - 2:
+                if out_type == 'linear':
+                    nonlinearity = lambda x: x
+                if out_type == 'sigmoid':
+                    nonlinearity = T.nnet.sigmoid
+                if out_type == 'tanh':
+                    nonlinearity = T.tanh
             layers.append(RecurrentLayer(dim[i], dim[i+1], init_size=init_size,
-                in_var=layers[-1].out))
+                in_var=layers[-1].out, nonlinearity=nonlinearity))
 
         self.out = layers[-1].out
 
+class CWLayer:
+    def __init__(self, input_size, output_size, hidden_units, modules,
+            in_var=T.matrix(), out_var=T.matrix(), init_type='xavier',
+            init_size=-1, nonlinearity=T.tanh):
+        x = in_var
+        y = out_var
+        params = []
+
+        self.x = x
+        h = []
+        time = theano.shared(np.array(0).astype(theano.config.floatX))
+        self.time = time
+
+        self.hidden = h
+        self.modules = modules
+
+        parammap = {}
+        sizeof_mod = hidden_units // modules
+        for i in range(modules):
+            h.append(theano.shared(np.zeros(sizeof_mod)
+                .astype(theano.config.floatX)))
+            for j in range(i+1):
+                parammap[str(i)+'_'+str(j)] = init_weights((sizeof_mod,
+                    sizeof_mod), init_type='xavier', scale=init_size)
+                parammap[str(i) + '_' + str(j) + 'b'] = init_weights(
+                        (sizeof_mod,), init_type='xavier', scale=init_size)
+
+        def recurrence(x, *prev_hidden):
+            pass
+
+
+
+    def reset(self):
+        for h in self.hidden:
+            h.set_value(np.zeros(h.shape.eval()))
 
 class LSTMLayer:
     '''
@@ -79,7 +119,7 @@ class LSTMLayer:
     '''
     def __init__(self, in_size, out_size, cell_size=None, init_size=-1,
             out_type='sigmoid', in_var=None, out_var=None, verbose=False,
-            mem_bias=5, initialization_type='xavier'):
+            mem_bias=1, initialization_type='xavier'):
         if cell_size == None:
             cell_size = max(in_size, out_size)
         self.in_size = in_size
@@ -115,7 +155,7 @@ class LSTMLayer:
         self.W_xm = init_weights((in_size, cell_size),
                 init_type=initialization_type, scale=init_size)
         self.b_m = init_weights((1, cell_size),
-                init_type=initialization_type, scale=init_size)
+                init_type='bias', scale=mem_bias)
 
 #        memories = T.tanh(T.dot(self.h, self.W_hm) + T.dot(self.x, self.W_xm) + self.b_m)
         #Remember Gate
@@ -220,9 +260,10 @@ class LSTM():
         verbose = kwargs.get('verbose', False)
         init_size = kwargs.get('init_size', 0.01)
         x = kwargs.get("in_var", T.matrix('Input'))
-        y = T.matrix('Output')
+        y = kwargs.get("out_var", T.matrix('Output'))
         self.x = x
         self.y = y
+
         init_size = kwargs.get('init_size', 1e-10)
         self.layers.append(LSTMLayer(dim[0], dim[1], in_var=x, verbose=False))
         for i in range(1, len(dim) - 1):
@@ -293,7 +334,7 @@ class LSTM():
 
 
 def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
-        epochs=1, miniepochs=1, save=None, saveiters=None):
+        epochs=1, miniepochs=1, save=None, saveiters=None, strides=1):
     """
     Train model on parts of a time series at a time
     e.g. given time seires : 1, 2, 3, 4, 5, 6
@@ -323,17 +364,17 @@ def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
     if batchSize <= 0: batchSize = x.shape[0]
     iterations = 0
     for j in range(epochs):
-        for batch in range(0, x.shape[0]):
+        for batch in range(0, x.shape[0], strides):
             train_error = train_error + miniBatchLearning(x[batch:batch+batchSize],
                     y[batch:batch+batchSize], -1, learn, verbose=False,
                     epochs=miniepochs)
             iterations += 1
-            if verbose: print("Epoch: ", "%.4f" % ((j+1) + batch/x.shape[0]),
+            if verbose: print("Epoch: ", "%.4f" % ((j) + batch/x.shape[0]),
                     "Error: ", (train_error[-1]))
             if save and saveiters:
                 if iterations % saveiters == 0:
                     save()
-        predict(x[batch])
+            predict(x[batch:batch+strides])
     return train_error
 
 
@@ -425,6 +466,8 @@ def RNNTest():
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
 
+def CWRNNTest():
+    model = CWLayer(1, 1, 16, 4)
 
 if __name__ == "__main__":
-    LSTMTest()
+    CWRNNTest()

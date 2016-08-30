@@ -46,6 +46,17 @@ class TestTrainers(unittest.TestCase):
         assert np.sum(np.abs(X_dat[:256] - FT_to_wav(wav_to_FT(X_dat)))) < 1
         assert np.sum(np.abs(XL_dat[:4864] - FT_to_wav(wav_to_FT(XL_dat)))) < 1
 
+
 class EyeConvnetTest(unittest.TestCase):
     def setup_dataTest(self):
         pass
+
+def test_LSTM_constructor():
+    from RecurrentNetworks import LSTM
+    try:
+        l =  LSTM(4, 4, 4, verbose=True)
+    except:
+        assert False
+
+if __name__ == "__main__":
+    test_LSTM_constructor()

@@ -110,6 +110,8 @@ class RBMLayer:
 def RBMTester():
     images, labels = readMNISTData(1000)
 
+    images = images.astype(theano.config.floatX)
+
     images = images / images.max()
 
 
