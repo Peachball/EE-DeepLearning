@@ -38,7 +38,8 @@ with respect to the weights, and then subtracting the gradient from the weights.
 This is known as gradient descent.
 
 \subsection{Neural Networks}
-Neural networks are a type of model, that attempts to try to learn patterns
+To understand the other models, one must first understand what a neural network
+is. Neural networks are a type of model, that attempts to try to learn patterns
 within data through stacking logistic regression models on each other. A
 logistic regression model predicts a value between 0 and 1 given some data,
 making it useful for classification problems, such as determining whether or not
@@ -48,7 +49,9 @@ the next set of classifiers. Through this, a neural network is created. The
 neural network was inspired by biological systems, as the outputs of each
 classifier can be thought of as activations for synapses in a brain. These types
 of models can generally model more complex data than other models in machine
-learning literature currently.
+learning literature currently. In practice, however, a neural network is just a
+series of matrix operations on an input vector, to calculate the desired output
+vector.
 
 \subsection{Deep Learning Overview}
 Deep learning simply takes the idea of neural networks, but makes them
@@ -69,10 +72,10 @@ sentence is.
 
 
 \subsection{Vanilla Recurrent Neural Networks}
-Recurrent networks are neural networks that can model time series data. This is
-typically used in speech recognition, as the meaning of a sound in speech is
-dependent on the sounds preceding it. Vanilla recurrent neural networks
-accomplish this task through being a neural network, except with some
+Recurrent networks are a variation of neural networks that can model time series
+data. This is typically used in speech recognition, as the meaning of a sound in
+speech is dependent on the sounds preceding it. Vanilla recurrent neural
+networks accomplish this task through being a neural network, except with some
 connections going through time.  The activation of a hidden node can be
 considered as $$a_t = W\cdot a_{t-1} + W\cdot I_t + b_a$$ where $a_t$ is the
 activation at time t, W is the corresponding weight matrix, $a_{t-1}$ is the
@@ -121,7 +124,12 @@ units to determine the energy of the system, the hidden units can be used as an
 input to another model. Typically, the hidden units of a restricted Boltzmann
 machine represent some higher level relationship within the data, for example,
 the edges of a picture, perhaps. Thus, they can be used to reduce the size of
-the input by a significant amount, and speed up the rest of training.
+the input by a significant amount, and speed up the rest of training. Also,
+after learning the weights for the restricted boltzmann machine, it is typically
+used as a layer for the neural network, which typically speed up training.
+However, restricted boltzmann machines are falling out of favor nowadays due to
+other initialization techniques for neural networks, and other new activation
+functions.
 
 \subsection{Convolution Neural Network}
 Convolutional networks are simply an element of a neural network, in which a
@@ -178,23 +186,46 @@ example, if the first update added 1 to a parameter, and the second gradient was
 also positive, the second update would add 1 multiplied with some constant,
 being 1.2 in this case. As a result, the updates can potentially increase
 exponentially, and will find the gradient with less iterations. However, this
-algorithm can only be used for batch learning, and as a result, could be slower.
+algorithm can only be used for batch learning, and as a result, is significantly
+slower for larger datasets. As a result, this training method will not be used
+in this paper, although it works for smaller models.
+
+\subsection{RMS Prop}
+A technique that was developed by Geoffrey Hinton in one of his lectures, this
+technique is a modification to the standard gradient descent method that in
+addition, keeps a moving average of the gradients squared~\cite{rmsprop}. Unlike
+gradient descent, instead of updating each weight through its gradient, it
+divides the calculated gradient by the average square root of the sum of
+previous gradients squared. As a result, if a weight constantly receives large
+gradients, the update will be divided by a larger value, resulting in the
+gradient update not being too large. Similarly, if a gradient for a weight is
+extremely small, the gradient will be divided by a smaller average gradient
+value, resulting in a larger gradient. Thus, the vanishing and exploding
+gradient problem can be resolved through this update mechanism, and furthermore,
+this mechanism can be used for mini batch learning as well as batch learning.
+Thus, this method is extremely powerful and will be used in the experiments.
 
 \subsection{Back Propagation Through Time}
 The gradient for a recurrent neural network differs significantly from a neural
 network, in that it is dependent on all the data given to the network before it,
-whereas the gradient for a neural network given a data sample, is that data
-sample. This process of finding the gradient throughout the previous data
-samples is known as back propagation through time, as to find the gradient, one
-needs to back propagate through the previous data samples. Thus, if the data
-sequence passed to a recurrent neural network is too long, then training the
-model will take a large amount of time.
+whereas the gradient for a neural network given a data sample, is dependent only
+on that data sample. This process of finding the gradient throughout the
+previous data samples is known as back propagation through time, as to find the
+gradient, one needs to back propagate through the previous data samples, which
+are assumed to have occurred earlier in time. Thus, if the data sequence passed
+to a recurrent neural network is too long, then training the model will take a
+large amount of time.
 
 A modification to this algorithm can be made, to speed up the training, through
-learning parts of the data sequence at a time. Essentially, mini batch learning
-can be applied, except when switching to another data sample, the value for the
-hidden units or memory of the network is generated before training the network
-on the other batch of data.
+learning parts of the data sequence at a time. The hidden variables of the
+recurrent model, such as the cell in a long short term memory network can be
+generated using the data. Then, instead of calculating the gradient with respect
+to all of the data samples, the gradient with respect to only the last, say, 100
+data samples can be utilized as an approximation of the gradient, which is
+significantly faster. However, as a result, the model will be even less able to
+learn long term patterns within the data, due to the gradient not being
+calculated with respect to all data samples.
+
 
 \subsection{Real Time Recurrent Learning}
 Although back propagation through time is simple to implement, it is
@@ -205,17 +236,29 @@ data sample.
 
 \subsection{Implementational Details}
 Python and Theano are used to test these models. Theano is considered to be very
-fast, amongst the machine learning community, which is why it is used. Also, a
+fast amongst the machine learning community, which is why it is used. Also, a
 gpu will be utilized to increase the performance of all models. The music
-utilized for the model will have come from Youtube.
+utilized for the model will have come from Youtube. Furthermore, to aid the
+model, the music will be put through a Fourier transform before having the model
+learn it. This is purely to produce nicer results, as when testing without the
+Fourier transform, the model took longer to train and produced more static,
+as opposed to the model trained on the Fourier transform.
 
 \section{Comparison}
+Thus, this paper will compare the effectiveness of the various models, being
+LSTMs, Vanilla Recurrent Networks, and Clockwork Recurrent Neural Networks,
+along with different dimensionality reducing steps. The different dimensionality
+reducing techniques that will also be tested will be autoencoders, restricted
+Boltzmann machines, and convolutional layers.
 
+However, the structure of the models will also be tested. According to the
+Google Research Blog, having different overlapping models can help improve
+accuracy, so a similar idea will be tested in this paper~\cite{widendeep}.
 \section{Data}
 
 \section{Appendix}
-\subsection{Code for Autoencoder}
-%\lstinputlisting[language=Python]{DeepLearning.py}
+As the code is extremely lengthy, it is stored separately. To view the code,
+check https://github.com/Peachball/EE-DeepLearning.
 
 \begin{thebibliography}{9}
 	\bibitem{deepnetworktrainers}
@@ -249,6 +292,15 @@ utilized for the model will have come from Youtube.
 	\bibitem{cw-rnn}
 		Koutnik, Jan et al. ``A Clockwork RNN.'' \textit{Dalle Molle Institute
 		for Artificial Intelligence Research}: n\. pag. Web. 25 May 2016.
+
+	\bibitem{rmsprop}
+		Hinton, Geoffrey. ``Neural Networks for Machine Learning.'' University
+		of Toronto. Web. 29 Aug. 2016.
+
+	\bibitem{widendeep}
+		Cheng, Heng-Tze. ``Wide and Deep Learning: Better Together with
+		Tensorflow.'' \textit{Google Research Blog}, 29 June 2016. Web. 29 Aug.
+		2016
 
 \end{thebibliography}
 
