@@ -17,20 +17,20 @@ class RecurrentLayer:
             hidden_size = max(in_size, out_size)
 
         w_io = init_weights((in_size, out_size), init_type='xavier',
-                init_size=init_size)
+                scale=init_size)
 
         w_ih = init_weights((in_size, hidden_size),
-        init_type='xavier', init_size=init_size)
+        init_type='xavier', scale=init_size)
 
         w_hh = init_weights((hidden_size, hidden_size),
-                init_type='xavier', init_size=init_size)
+                init_type='xavier', scale=init_size)
         b_h = init_weights((hidden_size), init_type='xavier',
-                init_size=init_size)
+                scale=init_size)
 
         w_ho = init_weights((hidden_size, out_size),
-                init_type='xavier', init_size=init_size)
+                init_type='xavier', scale=init_size)
         b_o = init_weights((out_size), init_type='xavier',
-                init_size=init_size)
+                scale=init_size)
 
         self.hidden = theano.shared(
                 value=np.zeros((hidden_size)).astype(theano.config.floatX))
@@ -76,6 +76,12 @@ class RNN:
                 in_var=layers[-1].out, nonlinearity=nonlinearity))
 
         self.out = layers[-1].out
+        updates = []
+        self.params = []
+        for l in layers:
+            updates = updates + l.updates
+            self.params = self.params + l.params
+        self.updates = updates
 
 class CWLayer:
     def __init__(self, input_size, output_size, hidden_units, modules,
@@ -165,8 +171,8 @@ class LSTMLayer:
                 init_type=initialization_type, scale=init_size)
         self.W_cr = init_weights((cell_size, cell_size),
                 init_type=initialization_type, scale=init_size)
-        self.b_r = init_weights((1, cell_size), init_type=initialization_type,
-                scale=init_size)
+        self.b_r = init_weights((1, cell_size), init_type='bias',
+                scale=mem_bias)
 
 #        remember = T.nnet.sigmoid(T.dot(self.h, self.W_hr) + T.dot(self.C, self.W_cr) + T.dot(self.x, self.W_xr) + self.b_r)
 
@@ -177,8 +183,8 @@ class LSTMLayer:
                 init_type=initialization_type, scale=init_size)
         self.W_xo = init_weights((in_size, out_size),
                 init_type=initialization_type, scale=init_size)
-        self.b_o = init_weights((1, out_size), init_type=initialization_type,
-                scale=init_size)
+        self.b_o = init_weights((1, out_size), init_type='bias',
+                scale=mem_bias)
 
         #Hidden
         self.W_ch = init_weights((cell_size, out_size),
@@ -187,8 +193,8 @@ class LSTMLayer:
                 init_type=initialization_type, scale=init_size)
         self.W_xh = init_weights((in_size, out_size),
                 init_type=initialization_type, scale=init_size)
-        self.b_h = init_weights((1, out_size), init_type=initialization_type,
-                scale=init_size)
+        self.b_h = init_weights((1, out_size), init_type='bias',
+                scale=mem_bias)
 
         self.params = [self.W_xf, self.W_hf, self.W_cf, self.b_f, self.W_hm, self.W_xm, self.b_m,
                 self.W_hr, self.W_cr, self.W_xr, self.b_r, self.W_co, self.W_ho,

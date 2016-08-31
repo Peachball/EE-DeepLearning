@@ -352,6 +352,8 @@ def get_data(index):
 
 def EEDataGenerator():
     #Build models
+    import time
+    timefile = open('times.txt', 'a')
     MODE = 'FAST_RUN'
     def construct_model(layers, m_type='lstm'):
         x = T.matrix()
@@ -365,23 +367,15 @@ def EEDataGenerator():
         if m_type == 'rnn':
             model = RNN(*((1024,) * (layers + 1)), in_var=x, out_var=y,
                     out_type='linear', init_size=6)
-            pass
+            out = model.out
 
         if m_type == 'overlapping_lstm':
             pass
 
         return (x, y, model, out)
 
-    scale, X_dat = get_data(0)
-    X_dat = X_dat[:1024]
-    Y_dat = X_dat[:1024]
-
-    #Test lstms
-    for i in range(3):
-        print("Constructing " + str(i+1) + " layer lstm")
-        x, y, m, o = construct_model(i+1, m_type='lstm')
+    def test_model(x, y, m, predict, name):
         error = T.mean(T.sum(T.sqr(y - o), axis=1))
-        predict = m.predict
 
         print("Calculating Gradient Updates...")
         (_, learn_updates) = generateRmsProp(m.params, error, alpha=0.01,
@@ -389,35 +383,45 @@ def EEDataGenerator():
         print("Compiling Learn Function")
         learn = theano.function([x, y], error, updates=learn_updates, mode=MODE)
 
-        def save():
-            saveParams(m.params, "LSTM_"+str(i+1)+"layer.npz")
-            return
-
-        def load():
-            loadParams(m.params, "LSTM_" + str(i+1) + "layer.npz")
-            return
-
-        print("Testing save function")
-        save()
-
-        print("Testing load function")
-        load()
-
+        start_time = time.clock()
         print("Beginning Training!")
         train_error = miniRecurrentLearning(X_dat, Y_dat, 20, learn, predict,
-                verbose=True, epochs=5, save=save, saveiters=100)
+                verbose=True, epochs=5)
 
-        pickle.dump(train_error, open(str(i+1) + 'layer_lstm.data', 'wb'))
+        duration = time.clock() - start_time
 
+        pickle.dump(train_error, open(name + '.data', 'wb'))
+
+        timefile.write(name + ' took ' + str(duration))
+
+    scale, X_dat = get_data(0)
+    X_dat = X_dat[:1024]
+    Y_dat = X_dat[:1024]
+
+    #Test overlapping LSTMs
+
+    #Test overlapping RNNs
+
+    #Test GRUS
+
+    #Test CWW
 
     #Test RNNs
     for i in range(3):
         print("Constructing " + str(i+1) + " layer rnn")
         x, y, m, o = construct_model(i+1, m_type='rnn')
+        predict = theano.function([x], o, updates=m.updates)
 
-    #Test overlapping LSTMs
+        test_model(x, y, m, predict, str(i+1) + 'LayerRNN')
 
-    #Test overlapping RNNs
+    #Test lstms
+    for i in range(3):
+        print("Constructing " + str(i+1) + " layer lstm")
+        x, y, m, o = construct_model(i+1, m_type='lstm')
+
+        predict = m.predict
+        test_model(x, y, m, predict, str(i+1) + 'LayerLSTM')
+
 
 if __name__ == '__main__':
     EEDataGenerator()

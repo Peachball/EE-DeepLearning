@@ -101,6 +101,13 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True):
         if scale < 0:
             scale = DEFAULT_SCALE
 
+        var = np.random.uniform(low=scale-0.001, high=scale+0.001,
+                size=shape).astype(theano.config.floatX)
+        if shared_var:
+            return theano.shared(var)
+        else:
+            return var
+
     if init_type == 'xavier':
         DEFAULT_SCALE = 6
         in_neurons = 0
@@ -109,18 +116,19 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True):
         if scale < 0:
             scale = DEFAULT_SCALE
 
-        if len(shape) == 1:
+        if isinstance(shape, int):
             # Shape 1 means that it is bias, therefore the initialization
             # doesn't really matter
             in_neurons = 400 #To get s approx. eq. to 0.05
             out_neurons = 0
             scale = 1
-        if len(shape) == 2:
+
+        elif len(shape) == 2:
             in_neurons = shape[0]
             out_neurons = shape[1]
 
         #Convolution: [output_channels, input_channels, rows, columns]
-        if len(shape) == 4:
+        elif len(shape) == 4:
             in_neurons = shape[1] * shape[2] * shape[3]
             out_neurons = shape[0] * shape[2] * shape[3]
 

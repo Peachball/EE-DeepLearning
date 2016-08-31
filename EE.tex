@@ -102,6 +102,19 @@ complexity of the model. As a result, tasks such as computing the gradient, the
 error, or predicting something with these models takes more time than a
 traditional recurrent neural network.
 
+However, the performance of the LSTM can be improved if it is allowed to reset
+it's memory state. As originally suggested by Gers, if a LSTM's memory is
+multiplied by a ``forget gate'', which is a value between 0 and 1, the LSTM can
+predict even longer sequences~\cite{forget}. Through forget gates, the memory of
+LSTM's are restrained from growing too large, which would cause the memory cells
+to be useless. Also, this addition of a forget gate intuitively, as useless
+memory should be discarded. The LSTM's in this paper will be assumed to have
+forget gates.
+
+
+\subsection{Gated Recurrent Units}
+
+
 \subsection{Clockwork Recurrent Neural Network}
 Another attempt to increase the memory of a vanilla recurrent neural network, is
 the clockwork recurrent neural network. These networks are identical to vanilla
@@ -172,6 +185,18 @@ functions, and be trained against mean squared error. The decoder part of the
 model will utilize the identity for the activation function, being that no
 nonlinearity will be applied to the activations.
 
+\section{Training Techniques}
+Because of the aforementioned gradient problems, normal methods of minimizing
+the error of these models are extremely slow. Thus, new techniques will be
+investigated, although they will not all be tested.
+
+\subsection{Xavier Initialization}
+One method to alleviate the vanishing gradient problem is better weight
+initialization. As Glorot and Bengio found
+
+\subsection{LSTM Techniques}
+
+
 \subsection{Rprop Trainer}
 The training method that is used is RPROP, originally devised by Reidmiller and
 Braun. This training method utilizes only the sign of the gradient, and has a
@@ -232,7 +257,7 @@ Although back propagation through time is simple to implement, it is
 expensive to calculate, as it requires a complete sequence of data. However,
 another derivation of the derivative of the cost function gives real time
 recurrent learning, which is only dependent on some stored variables, and one
-data sample.
+data sample. However, implementation of this algorithm is significantly 
 
 \subsection{Implementational Details}
 Python and Theano are used to test these models. Theano is considered to be very
@@ -301,6 +326,14 @@ check https://github.com/Peachball/EE-DeepLearning.
 		Cheng, Heng-Tze. ``Wide and Deep Learning: Better Together with
 		Tensorflow.'' \textit{Google Research Blog}, 29 June 2016. Web. 29 Aug.
 		2016
+
+	\bibitem{xavier}
+		Glorot, Xavier and Bengio, Yoshua. ``Understanding the difficulty of
+		training deep feedforward neural networks.'' \textit{Journal of Machine
+		Learning Research}, Vol 9, 2010, pag. 249-256. Web. 30 Aug. 2016.
+
+	\bibitem{forgetgate}
+http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.55.5709&rep=rep1&type=pdf
 
 \end{thebibliography}
 
