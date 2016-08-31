@@ -4,7 +4,7 @@ import theano.tensor as T
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
-from DeepLearning import readMNISTData, readcv
+from DeepLearning import readMNISTData, readcv, miniBatchLearning
 
 class RBMLayer:
     def __init__(self, in_size, hidden_size, visible_type='det', hidden_type='det',
@@ -14,6 +14,7 @@ class RBMLayer:
         self.hidden_size = hidden_size
         self.distribution = distribution
         self.in_var = in_var
+        self.x = in_var
 
         if theano_rng == None:
             theano_rng = T.shared_randomstreams.RandomStreams()
@@ -25,6 +26,7 @@ class RBMLayer:
         self.c = theano.shared(value=np.random.uniform(low=-init_size,
             high=init_size, size=(hidden_size)).astype(theano.config.floatX),
             name='Hidden Biases')
+
 
         self.w = theano.shared(value=np.random.uniform(low=-init_size,
             high=init_size, size=(in_size, hidden_size))
@@ -40,16 +42,20 @@ class RBMLayer:
                 .astype(theano.config.floatX),
                 name='Persistent CD')
 
+        self.params = [self.b, self.c, self.w]
+
     def getHidden(self, v):
         h = T.dot(v, self.w) + self.c
         h_sigmoid = T.nnet.sigmoid(h)
-        h_bin = self.theano_rng.binomial(size=h.shape, n=1, p=h_sigmoid)
+        h_bin = self.theano_rng.binomial(size=h.shape, n=1, p=h_sigmoid,
+                dtype=theano.config.floatX)
         return [h, h_sigmoid, h_bin]
 
     def getVisible(self, h):
         v = T.dot(h, self.w.T) + self.b
         v_sigmoid = T.nnet.sigmoid(v)
-        v_bin = self.theano_rng.binomial(size=v.shape, n=1, p=v_sigmoid)
+        v_bin = self.theano_rng.binomial(size=v.shape, n=1, p=v_sigmoid,
+                dtype=theano.config.floatX)
         return [v, v_sigmoid, v_bin]
 
     def sample_vhv(self, v):
@@ -60,10 +66,45 @@ class RBMLayer:
     def free_energy(self, v):
         bias = T.dot(v, self.b)
 
-        [_, hidden, _] = getHidden(v)
+        # [_, hidden, _] = self.getHidden(v)
+        hidden = T.dot(v, self.w) + self.c
         not_bias = T.sum(T.log(1 + T.exp(hidden)), axis=1)
 
         return -bias - not_bias
+
+
+    def cost_updates(self, lr=0.1, persistent=None, k=1):
+        positive_cost = self.free_energy(self.x)
+        lr = theano.shared(np.array(lr).astype(theano.config.floatX))
+
+        if not persistent:
+            persistent = theano.shared(np.zeros((1,
+                self.in_size)).astype(theano.config.floatX))
+
+        def gibbsSample(prev_chain):
+            _, _, new_hid = self.getHidden(prev_chain)
+            _, _, new_v = self.getVisible(new_hid)
+            return new_hid, new_v
+
+        print(persistent)
+        gibbsSample(persistent)
+        ([_, chain], updates) = theano.scan(gibbsSample,
+                outputs_info=[None, persistent], n_steps=k)
+
+        chain_end = chain[-1]
+        neg_cost = self.free_energy(chain_end)
+
+        cost = T.mean(positive_cost) - T.mean(neg_cost)
+
+        #Calculate gradient
+        gparams = T.grad(cost, self.params, consider_constant=[chain_end])
+        gradUpdates = []
+        gradUpdates.append((persistent, chain_end))
+
+        for g, p in zip(gparams, self.params):
+            gradUpdates.append((p, p - lr * g))
+
+        return cost, gradUpdates
 
 
     def CDUpdates(self, x, alpha):
@@ -86,9 +127,6 @@ class RBMLayer:
         updates.append((self.persistentCD, newCD_v))
         return updates
 
-    def getHidden(self, x):
-        return self.distribution(T.dot(x, self.w) + self.b)
-
     def gibbSample(self, startSample, k=1):
         sample = startSample
         for i in range(k):
@@ -108,27 +146,32 @@ class RBMLayer:
         return train_error
 
 def RBMTester():
+    theano.config.floatX='float32'
     images, labels = readMNISTData(1000)
 
     images = images.astype(theano.config.floatX)
 
     images = images / images.max()
 
-
-    rbm = RBMLayer(784, 600)
-
+    x = T.matrix()
     y = T.matrix()
-    mse = T.mean(T.sqr(rbm.out - y))
+
+    rbm = RBMLayer(784, 600, in_var=x)
+
+    mse = T.mean(T.sqr(rbm.sample_vhv(x) - y))
 
     negSample = theano.shared(value=rbm.gibbSample(images)).astype(theano.config.floatX)
-    updates = rbm.CDUpdates(rbm.in_var, 0.01)
+
+    persistent = theano.shared(np.zeros((10,
+        784)).astype(theano.config.floatX))
+    _, updates = rbm.cost_updates(lr=0.01, persistent=persistent)
 
 
-    learn = theano.function([rbm.in_var, y], mse, updates=updates,
+    learn = theano.function([rbm.x, y], mse, updates=updates,
             allow_input_downcast=True)
 
+    miniBatchLearning(images, images, 100, learn, verbose=True, epochs=100)
 
-    rbm.miniBatch(learn, images, verbose=True, epochs=100)
     sampled = rbm.gibbSample(images)
 
     for i in range(10):
