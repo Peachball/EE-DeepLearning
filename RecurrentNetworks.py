@@ -5,6 +5,7 @@ from theano import config
 from DeepLearning import *
 import matplotlib.pyplot as plt
 import time
+import math
 
 class RecurrentLayer:
 
@@ -86,38 +87,70 @@ class RNN:
 class CWLayer:
     def __init__(self, input_size, output_size, hidden_units, modules,
             in_var=T.matrix(), out_var=T.matrix(), init_type='xavier',
-            init_size=-1, nonlinearity=T.tanh):
+            init_size=-1, nonlinearity=T.tanh, h_nonlinearity=T.tanh):
         x = in_var
         y = out_var
         params = []
 
         self.x = x
-        h = []
         time = theano.shared(np.array(0).astype(theano.config.floatX))
         self.time = time
 
-        self.hidden = h
+        self.hidden = theano.shared(np.zeros(hidden_units)
+                .astype(theano.config.floatX))
         self.modules = modules
 
-        parammap = {}
-        sizeof_mod = hidden_units // modules
-        for i in range(modules):
-            h.append(theano.shared(np.zeros(sizeof_mod)
-                .astype(theano.config.floatX)))
-            for j in range(i+1):
-                parammap[str(i)+'_'+str(j)] = init_weights((sizeof_mod,
-                    sizeof_mod), init_type='xavier', scale=init_size)
-                parammap[str(i) + '_' + str(j) + 'b'] = init_weights(
-                        (sizeof_mod,), init_type='xavier', scale=init_size)
+        weight_val = init_weights((hidden_units, hidden_units), scale=0.05,
+                shared_var=False)
+        sizeof_mod = math.ceil(hidden_units / modules)
 
-        def recurrence(x, *prev_hidden):
-            pass
+        if modules <= 1:
+            raise Exception("Invalid Module size")
 
+        for i in range(1, modules):
+            weight_val[:((i) * sizeof_mod)] = 0
+        self.wh = theano.shared(weight_val.astype(theano.config.floatX))
+        self.bh = init_weights(hidden_units)
+        self.wi = init_weights((input_size, hidden_units), init_type=init_type,
+                scale=init_size)
 
+        self.wo = init_weights((hidden_units, output_size), init_type=init_type,
+                scale=init_size)
+        self.bo = init_weights(output_size, scale=init_size)
+
+        def recurrence(x, prev_hidden):
+            act_modules = 0
+            for i in range(modules):
+                if time % math.pow(2, i) == 0:
+                    act_modules += 1
+
+            update_indices = act_modules * sizeof_mod
+
+            w_subtensor = self.wh[:update_indices]
+            b_subtensor = self.bh[:update_indices]
+
+            inp_updates = T.dot(x, self.wi)[:update_indices]
+            pre_new_h = T.dot(w_subtensor, prev_hidden) + inp_updates + b_subtensor
+            new_h = T.set_subtensor(prev_hidden[:update_indices],
+                    h_nonlinearity(pre_new_h))
+
+            out = nonlinearity(T.dot(new_h, self.wo) + self.bo)
+
+            return new_h, out
+
+        ([hiddens, outputs], updates) = theano.scan(recurrence,
+                                            sequences=[x],
+                                            outputs_info=[self.hidden, None])
+        self.out = outputs
+        self.hidden = hiddens[-1]
+        self.updates = updates
+
+        self.params = [self.wh, self.bh, self.wi, self.wo, self.bo]
 
     def reset(self):
-        for h in self.hidden:
-            h.set_value(np.zeros(h.shape.eval()))
+        shape = self.hidden.get_value().shape
+        self.hidden.set_value(np.zeros(shape).astype(theano.config.floatX))
+        self.time.set_value(np.zeros(1).astype(theano.config.floatX))
 
 class LSTMLayer:
     '''
@@ -383,6 +416,10 @@ def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
             predict(x[batch:batch+strides])
     return train_error
 
+def gen_sine_data(amount=100):
+    x = np.linspace(0, 10, amount).reshape(-1, 1)
+    y = np.sin(x)
+    return x, y
 
 def LSTMTest():
     x = np.linspace(0, 10, 100)
@@ -473,7 +510,25 @@ def RNNTest():
     plt.show()
 
 def CWRNNTest():
-    model = CWLayer(1, 1, 16, 4)
+    x, y = gen_sine_data()
+    model = RecurrentLayer(1, 1, hidden_size=10)
+
+    correct = T.matrix()
+    out = model.out
+
+    error = T.mean(T.sum(T.sqr(out - correct), axis=1))
+
+    (storage, grad_updates) = generateRmsProp(model.params, error, alpha=0.01)
+
+    updates = grad_updates + model.updates
+    learn = theano.function([model.x, correct], error, updates=updates)
+    predict = theano.function([model.x], out, updates=model.updates)
+
+    for i in range(5000):
+        print(learn(x, y))
+
+    plt.plot(x, predict(x))
+    plt.show()
 
 if __name__ == "__main__":
     CWRNNTest()

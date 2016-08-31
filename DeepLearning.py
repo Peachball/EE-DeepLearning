@@ -92,8 +92,12 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True):
         DEFAULT_SCALE = 0.05
         if scale < 0:
             scale = DEFAULT_SCALE
-        return np.random.uniform(low=-scale, high=scale, size=shape).astype(
+        val = np.random.uniform(low=-scale, high=scale, size=shape).astype(
                 theano.config.floatX)
+        if shared_var:
+            return theano.shared(val)
+        else:
+            return val
 
     if init_type == 'bias':
         DEFAULT_SCALE = 1
@@ -116,7 +120,7 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True):
         if scale < 0:
             scale = DEFAULT_SCALE
 
-        if isinstance(shape, int):
+        if isinstance(shape, int) or len(shape)==1:
             # Shape 1 means that it is bias, therefore the initialization
             # doesn't really matter
             in_neurons = 400 #To get s approx. eq. to 0.05
