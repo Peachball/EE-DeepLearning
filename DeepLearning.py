@@ -739,25 +739,29 @@ def NNTester():
     plt.savefig("test.png")
     plt.show()
 
-def normalize(x, dim=0, default=1, mean=0, scaleFactor=None):
+def normalize(x, dim=0, low=-1, high=1, scaleFactor=None):
+    if low >= high:
+        raise Exception("Bad boundaries")
     if scaleFactor == None:
-        means = np.mean(x, axis=dim)
-
-        maxes = np.max(np.abs(x - means), axis=dim)
-        maxes[maxes==0] = default
-
-        maxes = np.expand_dims(maxes, axis=dim)
-        means = np.expand_dims(means, axis=dim)
+        mins = np.min(x, axis=dim)
+        maxes = np.max(x, axis=dim)
+        eq = np.equal(mins, maxes)
+        range = np.where(eq, np.ones(maxes.shape), maxes - mins)
     else:
-        maxes, means = scaleFactor
-    return ((maxes, means), (x - means + (mean * means)) / maxes)
+        maxes, mins = scaleFactor
+    return ((maxes, mins),
+            (((x - mins) / (range) * (high - low)) + low))
 
-def scaleBack(x, scale):
-    maxes, means = scale
-    return (x*maxes) + means
-
+def scaleBack(x, scale, dim=0):
+    high, low = scale
+    mins = np.min(x, axis=dim)
+    maxes = np.max(x, axis=dim)
+    eq = np.equal(mins, maxes)
+    range = np.where(eq, np.ones(maxes.shape), maxes - mins)
+    return (((x - mins) / (range) * (high - low)) + low)
 
 from PIL import Image
+
 def convertImageToArray(index, size=(100, 100)):
     filename = 'imageDataSet/' + str(index)
     im = Image.open(filename)

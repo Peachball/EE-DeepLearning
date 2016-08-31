@@ -58,5 +58,16 @@ def test_LSTM_constructor():
     except:
         assert False
 
+def test_normalize():
+    from DeepLearning import normalize, scaleBack
+    x = np.random.uniform(low=-100, high=100, size=(100,
+        100)).astype('float32')
+
+    scale, new_x = normalize(x)
+
+    print(new_x.max(), new_x.min())
+    print(np.sum(scaleBack(new_x, scale) - x))
+    assert np.sum(scaleBack(new_x, scale) - x) < 0.001
+
 if __name__ == "__main__":
-    test_LSTM_constructor()
+    test_normalize()
