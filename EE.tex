@@ -5,6 +5,9 @@
 \usepackage{graphicx}
 \usepackage{listings}
 \usepackage{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[american]{babel}
+\usepackage{csquotes}
 
 \geometry{margin=1in}
 \graphicspath{{EEimages/}}
@@ -37,23 +40,40 @@ assumed to be minimized through calculating the gradient of the cost function
 with respect to the weights, and then subtracting the gradient from the weights.
 This is known as gradient descent.
 
+\subsection{Logistic Regression Model}
+To understand learning algorithms, the logistic regression model is notable, as
+it is the fundamental building block for larger models. This model predicts a
+class based on an input vector of data. Given that: 
+$$ \textrm{The input vector} = x$$
+and that any value represented by W is a weight matrix that the model learns,
+the logistic regression model can be represented as:
+$$ \textrm{output} = \sigma(x\cdot W) $$
+where:
+$$\sigma(x) = \frac{1}{1 + e^{-x}} $$
+However, this model typically also includes a bias term, to improve performance,
+changing the equation to:
+$$ \textrm{output} = \sigma(x\cdot W + b) $$
+
+Logistic regression models typically are used to predict the probability of a
+situation or event, based on data. For example, it could be used to predict how
+likely someone is to develop cancer based on the data relating to the medical
+history of the patient.
+
 \subsection{Neural Networks}
 To understand the other models, one must first understand what a neural network
 is. Neural networks are a type of model, that attempts to try to learn patterns
 within data through stacking logistic regression models on each other. A
-logistic regression model predicts a value between 0 and 1 given some data,
-making it useful for classification problems, such as determining whether or not
-someone will have cancer, based on data. To stack logistic regression
-classifiers means to put the output of one set of classifiers as the input as
-the next set of classifiers. Through this, a neural network is created. The
-neural network was inspired by biological systems, as the outputs of each
-classifier can be thought of as activations for synapses in a brain. These types
-of models can generally model more complex data than other models in machine
-learning literature currently. In practice, however, a neural network is just a
-series of matrix operations on an input vector, to calculate the desired output
-vector.
+logistic regression model predicts a value between 0 and 1 given some data.  To
+stack logistic regression classifiers means to put the output of one set of
+classifiers as the input as the next set of classifiers. Through this, a neural
+network is created.  The neural network was inspired by biological systems, as
+the outputs of each classifier can be thought of as activations for synapses in
+a brain. These types of models can generally model more complex data than other
+models in machine learning literature currently. In practice, however, a neural
+network is just a series of matrix operations on an input vector, to calculate
+the desired output vector.
 
-\subsection{Deep Learning Overview}
+\subsection{Deep Learning}
 Deep learning simply takes the idea of neural networks, but makes them
 significantly larger. Typical neural networks only have 2 through 4 layers,
 where each layer is essentially a logistic regression classifier. However,
@@ -68,7 +88,7 @@ Deep learning algorithms however, are capable of much more complex tasks than
 neural networks, due to their increased size. Some applications of these deep
 networks is SyntaxNet, an algorithm that can correctly determine the grammatical
 structure of a sentence, such as determining what the direct object of a
-sentence is.
+sentence is~\cite{syntaxnet}.
 
 
 \subsection{Vanilla Recurrent Neural Networks}
@@ -77,11 +97,12 @@ data. This is typically used in speech recognition, as the meaning of a sound in
 speech is dependent on the sounds preceding it. Vanilla recurrent neural
 networks accomplish this task through being a neural network, except with some
 connections going through time.  The activation of a hidden node can be
-considered as $$a_t = W\cdot a_{t-1} + W\cdot I_t + b_a$$ where $a_t$ is the
-activation at time t, W is the corresponding weight matrix, $a_{t-1}$ is the
-activation of the node at one step before the time, and $I_t$ is the input at
-that time. The activation typically goes through a nonlinearity, such as a
-sigmoid function before being passed to the next node. These models
+considered as 
+$$a_t = W\cdot a_{t-1} + W\cdot I_t + b_a$$
+where $a_t$ is the activation at time t, W is the corresponding weight matrix,
+$a_{t-1}$ is the activation of the node at one step before the time, and $I_t$
+is the input at that time. The activation typically goes through a nonlinearity,
+such as a sigmoid function before being passed to the next node. These models
 theoretically can model time series, but in practice they do not have much
 memory. As the length of the time series increases, these models become prone to
 ``forgetting'' earlier samples in the input data. Thus, other more complicated
@@ -92,17 +113,14 @@ A model that attempts to overcome the short term memory of vanilla neural
 networks is the long short term memory network. These networks, through using
 cells and vectors that can be modified by the network, can store long term
 information. They do this through generating ``memories'', through the function:
+$$M = \tanh(W\cdot C + W\cdot I_t + b_M)$$ where C denotes the cell state of the
+network, as originally envisioned by Horchreiter~\cite{lstm}. However, these
+networks are significantly more computationally expensive, due to the
+significantly increased complexity of the model. As a result, tasks such as
+computing the gradient, the error, or predicting something with these models
+takes more time than a traditional recurrent neural network.
 
-$$M = \tanh(W\cdot C + W\cdot I_t + b_M)$$
-
-where C denotes the cell state of the network. For more information, refer to
-Horchreiter's original paper~\cite{lstm}. However, these networks are
-significantly more computationally expensive, due to the significantly increased
-complexity of the model. As a result, tasks such as computing the gradient, the
-error, or predicting something with these models takes more time than a
-traditional recurrent neural network.
-
-However, the performance of the LSTM can be improved if it is allowed to reset
+However, the accuracy of the LSTM can be improved if it is allowed to reset
 it's memory state. As originally suggested by Gers, if a LSTM's memory is
 multiplied by a ``forget gate'', which is a value between 0 and 1, the LSTM can
 predict even longer sequences~\cite{forget}. Through forget gates, the memory of
@@ -113,18 +131,31 @@ forget gates.
 
 
 \subsection{Gated Recurrent Units}
+Another variation off of recurrent networks are gated recurrent units, which
+follow a similar approach to LSTMs. Instead of completely reassigning the models
+hidden state each timestep, it instead updates its hidden state through the
+equation:
+$$h_t = (1 - z) * h_t + h'_t $$
+z is a unit that the model calculates, and is bounded between 0 and 1 with the
+sigmoid activation function. As a result, this type of network also has been
+found to have long term memories, making it comparable to the performance of
+LSTM's. Thus, this model will also be tested against LSTM's in its performance.
 
 
 \subsection{Clockwork Recurrent Neural Network}
 Another attempt to increase the memory of a vanilla recurrent neural network, is
-the clockwork recurrent neural network. These networks are identical to vanilla
-networks, except their hidden layer is partitioned. Each partition of hidden
-units is calculated for only some of the input, and thus is not updated at every
-time step. As a result, the partitions that are updated less often serve the
-purpose of being the memory for the network, and enable the model to
-``remember'' better than normal recurrent networks. Also, these networks are
-less computationally expensive than long short term memory networks, resulting
-in faster compile and training times.
+the clockwork recurrent neural network. Originally developed by Koutnik and his
+colleagues, these networks are identical to vanilla networks, except their
+hidden layer is partitioned~\cite{cw-rnn}. Each partition of hidden units is
+calculated for only some of the input, and thus is not updated at every time
+step. As a result, the partitions that are updated less often serve the purpose
+of being the memory for the network, and enable the model to ``remember'' better
+than normal recurrent networks. Also, these networks are less computationally
+expensive than long short term memory networks, resulting in faster compile and
+training times. In its original paper, it was concluded that it has
+significantly more representational power than LSTM's and GRU's with the same
+number of parameters, suggesting that this network is the most efficient network
+of them all~\cite{cw-rnn}.
 
 \subsection{Restricted Boltzmann Machines}
 The restricted Boltzmann machine is an unsupervised learning algorithm that
@@ -156,12 +187,8 @@ each pixel value with the corresponding filter value.
 \end{figure}
 Convolution neural networks are typically used for computer vision technologies,
 as elements in an image are generally more related to each other if they are
-closer to each other. However, as sound files are really just a large array of
-air pressures, the frequency of the various tones are not known. Thus,
-convolutional networks could be used to find patterns within the air pressures,
-determine the frequency of different sections, and through that, determine the
-,tone of the music at various points. Since music does have patterns in sounds
-that are closer together to each other, this solution is valid.
+closer to each other. 
+
 
 \subsection{Autoencoder}
 Autoencoders are also a form of unsupervised learning algorithm, as they simply
@@ -192,28 +219,33 @@ investigated, although they will not all be tested.
 
 \subsection{Xavier Initialization}
 One method to alleviate the vanishing gradient problem is better weight
-initialization. As Glorot and Bengio found
+initialization. As Glorot and Bengio found, the initialization of the weights
+affects the propagation of the gradient through the model~\cite{xavier}.
+Furthermore, random initialization with a sigmoid activation function causes
+problems, as typically the activation value will saturate, due to how the mean
+value for a sigmoid function is 0.5. What this means is that since the sigmoid
+function has a small gradient around x = 0, once
 
 \subsection{LSTM Techniques}
 
 
 \subsection{Rprop Trainer}
-The training method that is used is RPROP, originally devised by Reidmiller and
-Braun. This training method utilizes only the sign of the gradient, and has a
-stored matrix representing the magnitude in which the algorithm will update the
-parameters. The reason this method will be used, is because this algorithm is
-not affected by the vanishing gradient problem, or the exploding gradient
-problem, as the algorithm only worries about the sign of the gradient, being
-positive or negative. Furthermore, the algorithm approaches the minimum for the
-error function exponentially, as it will increase the magnitude of the update
-if the previous update was in the same direction as the current update. For
-example, if the first update added 1 to a parameter, and the second gradient was
-also positive, the second update would add 1 multiplied with some constant,
-being 1.2 in this case. As a result, the updates can potentially increase
-exponentially, and will find the gradient with less iterations. However, this
-algorithm can only be used for batch learning, and as a result, is significantly
-slower for larger datasets. As a result, this training method will not be used
-in this paper, although it works for smaller models.
+A training method that was considered was RPROP, originally devised by
+Reidmiller and Braun~\cite{rprop}. This training method utilizes only the sign
+of the gradient, and has a stored matrix representing the magnitude in which the
+algorithm will update the parameters. The reason this method will be used, is
+because this algorithm is not affected by the vanishing gradient problem, or the
+exploding gradient problem, as the algorithm only worries about the sign of the
+gradient, being positive or negative. Furthermore, the algorithm approaches the
+minimum for the error function exponentially, as it will increase the magnitude
+of the update if the previous update was in the same direction as the current
+update. For example, if the first update added 1 to a parameter, and the second
+gradient was also positive, the second update would add 1 multiplied with some
+constant, being 1.2 in this case. As a result, the updates can potentially
+increase exponentially, and will find the gradient with less iterations.
+However, this algorithm can only be used for batch learning, and as a result, is
+significantly slower for larger datasets. As a result, this training method will
+not be used in this paper, although it works for smaller models.
 
 \subsection{RMS Prop}
 A technique that was developed by Geoffrey Hinton in one of his lectures, this
@@ -285,6 +317,7 @@ accuracy, so a similar idea will be tested in this paper~\cite{widendeep}.
 As the code is extremely lengthy, it is stored separately. To view the code,
 check https://github.com/Peachball/EE-DeepLearning.
 
+
 \begin{thebibliography}{9}
 	\bibitem{deepnetworktrainers}
 		Larochelle, Hugo et al. ``Exploring Strategies for Training Deep Neural
@@ -333,8 +366,29 @@ check https://github.com/Peachball/EE-DeepLearning.
 		Learning Research}, Vol 9, 2010, pag. 249-256. Web. 30 Aug. 2016.
 
 	\bibitem{forgetgate}
-http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.55.5709&rep=rep1&type=pdf
+		Gers, Schmidhuber, and Cummings. ``Learning to Forget: Continual
+		Prediction with LSTM." \textit{ISDIA}, 1999 pag. 1-19. Web. 30 Aug.
+		2016.
 
+	\bibitem{syntaxnet}
+		Petrov, Slav. ``Announcing SyntaxNet: The World's Most Accurate Parser
+		Goes Open Source.'' \textit{Google Research Blob}, 12 May 2016. Web. 20
+		Aug. 2016.
+
+	\bibitem{gru}
+		Chung, Gulcehre, Cho, and Bengio. ``Empirical Evaluation of Gated
+		Recurrent Models on Sequence Modeling.'' \textit{arXiv} Web. 20 Aug.
+		2016.
+
+	\bibitem{convrnn}
+		Abdel-Hamid, Deng, and Yu. ``Exploring Convolutional Neural Network
+		Structures and Optimization Techniques for Speech Recognition.''
+		\textit{Microsoft Research}, 2013, pag. 3366-3370. Web. 20 Aug. 2016.
+
+	\bibitem{rprop}
+		Riedmiller, Martin and Braun, Henrich. ``A Direct Adaptive Method for
+		Faster Backpropagation Learning: The RPROP Algorithm.'' \textit{The
+		University of Karlsruhe}, 1993, pag. 586-591. Web. 20 Aug. 2016.
 \end{thebibliography}
 
 \end{document}
