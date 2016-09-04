@@ -147,11 +147,12 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True,
                 size=shape).astype(theano.config.floatX), name=name)
 
 
-def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
+def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8, verbose=False):
     updates = []
     history = []
 
     gradients = T.grad(error, params)
+    count = 0
     for p, grad in zip(params, gradients):
         shape = p.get_value().shape
 
@@ -162,7 +163,11 @@ def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):
         updates.append((p, p - grad / (T.sqrt(new_g) + epsilon) * alpha))
 
         history.append(totalG)
+        count += 1
+        if verbose: print("\rGradient {}/{} Done".format(count, len(params)),
+                end='')
 
+    if verbose: print('')
     return (history, updates)
 
 def generateAdadelta(params, error, decay=0.9, alpha=1, epsilon=1e-8):

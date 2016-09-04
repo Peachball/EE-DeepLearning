@@ -358,35 +358,97 @@ def EEDataGenerator():
     def construct_model(layers, m_type='lstm'):
         x = T.matrix()
         y = T.matrix()
+        updates = None
 
         if m_type == 'lstm':
             model = LSTM(*((1024,) * (layers + 1)), in_var=x, out_var=y,
                     out_type='linear', init_size=6)
+            params = model.params
+            updates = model.updates
             out = model.out
+            reset = model.reset
 
         if m_type == 'rnn':
             model = RNN(*((1024,) * (layers + 1)), in_var=x, out_var=y,
                     out_type='linear', init_size=6)
             out = model.out
+            params = model.params
+            reset = model.reset
+
+        if m_type == 'cwrnn':
+            nonlinearity = T.tanh
+            if layers == 1:
+                nonlinearity = lambda x:x
+            resets = []
+            m = CWLayer(1024, 1024, 1024, 16, in_var=x,
+                    nonlinearity=nonlinearity)
+            updates = m.updates
+            resets.append(m.reset)
+            params = m.params
+            for i in range(layers-1):
+                if layers == layers - 2:
+                    nonlinearity = lambda x:x
+                m = CWLayer(1024, 1024, 1024, 16, in_var=m.out,
+                        nonlinearity=nonlinearity)
+
+                updates += m.updates
+                resets.append(m.reset)
+                params += m.params
+            def r():
+                for res in resets:
+                    res()
+                return
+            reset = r
+            out = m.out
+
+        if m_type == 'gru':
+            nonlinearity = T.tanh
+            if layers == 1:
+                nonlinearity = lambda x:x
+            resets = []
+            lays = []
+            m = GRULayer(1024, 1024, cell_size=1024, in_var=x,
+                    nonlinearity=nonlinearity)
+            resets.append(m.reset)
+            params = m.params
+            updates = m.updates
+            for i in range(layers-1):
+                if layers == layers - 2:
+                    nonlinearity = lambda x:x
+                m = GRULayer(1024, 1024, cell_size=1024, in_var=m.out,
+                        nonlinearity=nonlinearity)
+
+                updates += m.updates
+                resets.append(m.reset)
+                params += m.params
+
+            def r():
+                for re in resets: re()
+                return
+
+            reset = r
+            reset()
+            out = m.out
 
         if m_type == 'overlapping_lstm':
             pass
 
-        return (x, y, model, out)
+        return (x, y, params, out, updates, reset)
 
-    def test_model(x, y, m, predict, name):
+    def test_model(x, y, params, predict, reset, name):
         error = T.mean(T.sum(T.sqr(y - o), axis=1))
 
         print("Calculating Gradient Updates...")
-        (_, learn_updates) = generateRmsProp(m.params, error, alpha=0.01,
+        (_, learn_updates) = generateAdagrad(params, error, alpha=0.0001,
                 verbose=True)
         print("Compiling Learn Function")
-        learn = theano.function([x, y], error, updates=learn_updates, mode=MODE)
+        learn = theano.function([x, y], error, updates=learn_updates,
+                mode=MODE, allow_input_downcast=True)
 
         start_time = time.clock()
         print("Beginning Training!")
-        train_error = miniRecurrentLearning(X_dat, Y_dat, 20, learn, predict,
-                verbose=True, epochs=5)
+        train_error = miniRecurrentLearning(X_dat, Y_dat, 50, learn, predict,
+                reset, verbose=True, epochs=5)
 
         duration = time.clock() - start_time
 
@@ -396,6 +458,7 @@ def EEDataGenerator():
 
     scale, X_dat = get_data(0)
     X_dat = X_dat[:1024]
+    print(X_dat.min(), X_dat.max())
     Y_dat = X_dat[:1024]
 
     #Test RBM
@@ -405,24 +468,40 @@ def EEDataGenerator():
     #Test overlapping RNNs
 
     #Test GRUS
+    for i in range(3):
+        print("Constructing " + str(i+1) + " layer GRU")
+        x, y, params, o, updates, reset = construct_model(i+1, m_type='gru')
+        predict = theano.function([x], updates=updates,
+                allow_input_downcast=True)
 
-    #Test CWW
+        test_model(x, y, params, predict, reset, str(i+1) + 'LayerGRU')
+
+    #Test CW
+    for i in range(3):
+        print("Constructing " + str(i+1) + " layer cw-rnn")
+        x, y, params, o, updates, reset = construct_model(i+1, m_type='cwrnn')
+        predict = theano.function([x], updates=updates,
+                allow_input_downcast=True)
+
+        test_model(x, y, params, predict, reset, str(i+1) + 'LayerCWRNN')
 
     #Test RNNs
     for i in range(3):
         print("Constructing " + str(i+1) + " layer rnn")
-        x, y, m, o = construct_model(i+1, m_type='rnn')
-        predict = theano.function([x], o, updates=m.updates)
+        x, y, params, o, updates, reset = construct_model(i+1, m_type='rnn')
+        predict = theano.function([x], o, updates=updates,
+                allow_input_downcast=True)
 
-        test_model(x, y, m, predict, str(i+1) + 'LayerRNN')
+        test_model(x, y, params, predict, reset, str(i+1) + 'LayerRNN')
 
     #Test lstms
     for i in range(3):
         print("Constructing " + str(i+1) + " layer lstm")
-        x, y, m, o = construct_model(i+1, m_type='lstm')
+        x, y, params, o, updates, reset = construct_model(i+1, m_type='lstm')
 
-        predict = m.predict
-        test_model(x, y, m, predict, str(i+1) + 'LayerLSTM')
+        predict = theano.function([x], o, updates=updates,
+                allow_input_downcast=True)
+        test_model(x, y, params, predict, str(i+1) + 'LayerLSTM')
 
 
 if __name__ == '__main__':

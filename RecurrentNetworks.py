@@ -158,7 +158,7 @@ class CWLayer:
     def reset(self):
         shape = self.hidden.get_value().shape
         self.hidden.set_value(np.zeros(shape).astype(theano.config.floatX))
-        self.time.set_value(np.zeros(1).astype(theano.config.floatX))
+        self.time.set_value(0.0)
 
 class GRULayer:
     def __init__(self, in_size, out_size, cell_size=None, init_size=-1,
@@ -217,7 +217,7 @@ class GRULayer:
         updates.update({self.hidden: hiddens[-1]})
         self.updates = [(self.hidden, hiddens[-1])]
 
-    def reset():
+    def reset(self):
         shape = self.hidden.get_value().shape
         self.hidden.set_value(np.zeros(shape).astype(theano.config.floatX))
 
@@ -451,7 +451,7 @@ class LSTM():
             p.set_value(params[n])
 
 
-def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
+def miniRecurrentLearning(x, y, batchSize, learn, predict, reset, verbose=False,
         epochs=1, miniepochs=1, save=None, saveiters=None, strides=1):
     """
     Train model on parts of a time series at a time
@@ -493,6 +493,7 @@ def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
                 if iterations % saveiters == 0:
                     save()
             predict(x[batch:batch+strides])
+        reset()
     return train_error
 
 def gen_sine_data(amount=100):
