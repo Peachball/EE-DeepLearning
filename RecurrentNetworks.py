@@ -87,10 +87,18 @@ class RNN:
 class CWLayer:
     def __init__(self, input_size, output_size, hidden_units, modules,
             in_var=T.matrix(), out_var=T.matrix(), init_type='xavier',
-            init_size=-1, nonlinearity=T.tanh, h_nonlinearity=T.tanh):
+            init_size=-1, nonlinearity=T.tanh, h_nonlinearity=T.tanh,
+            periods=None):
         x = in_var
         y = out_var
         params = []
+
+        if periods is None:
+            val = np.arange(modules).astype(theano.config.floatX)
+            val = 2 ** val
+            p = theano.shared(val)
+        else:
+            p = theano.shared(np.array(periods))
 
         self.x = x
         time = theano.shared(np.array(0).astype(theano.config.floatX))
@@ -104,7 +112,7 @@ class CWLayer:
                 shared_var=False)
         sizeof_mod = math.ceil(hidden_units / modules)
 
-        if modules <= 1:
+        if modules <= 1 or modules > hidden_units:
             raise Exception("Invalid Module size")
 
         for i in range(1, modules):
@@ -119,10 +127,7 @@ class CWLayer:
         self.bo = init_weights(output_size, scale=init_size)
 
         def recurrence(x, cur_time, prev_hidden):
-            act_modules = 0
-            for i in range(modules):
-                if cur_time % math.pow(2, i) == 0:
-                    act_modules += 1
+            act_modules = modules - T.argmin((cur_time % p)[::-1])
 
             update_indices = act_modules * sizeof_mod
 
@@ -586,16 +591,13 @@ def CWRNNTest():
 
     (storage, grad_updates) = generateRmsProp(model.params, error, alpha=0.01)
 
-    learn = theano.function([model.x, correct], error, updates=grad_updates)
+    learn = theano.function([model.x, correct], error, updates=grad_updates,
+            allow_input_downcast=True)
     predict = theano.function([model.x], out, updates=model.updates,
             allow_input_downcast=True)
 
-    print(model.wh.get_value())
-
-    for i in range(2):
-        print(model.hidden.get_value())
-        print(predict(np.random.rand(10, 1)))
-        print(model.hidden.get_value())
+    for i in range(1000):
+        print(learn(np.zeros(y.shape), y))
 
     plt.plot(x, predict(np.zeros(y.shape)))
     plt.show()
