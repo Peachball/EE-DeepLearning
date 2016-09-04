@@ -108,7 +108,7 @@ class CWLayer:
             raise Exception("Invalid Module size")
 
         for i in range(1, modules):
-            weight_val[:((i) * sizeof_mod)] = 0
+            weight_val[(i * sizeof_mod):,:(i * sizeof_mod)] = 0
         self.wh = theano.shared(weight_val.astype(theano.config.floatX))
         self.bh = init_weights(hidden_units)
         self.wi = init_weights((input_size, hidden_units), init_type=init_type,
@@ -118,10 +118,10 @@ class CWLayer:
                 scale=init_size)
         self.bo = init_weights(output_size, scale=init_size)
 
-        def recurrence(x, prev_hidden):
+        def recurrence(x, cur_time, prev_hidden):
             act_modules = 0
             for i in range(modules):
-                if time % math.pow(2, i) == 0:
+                if cur_time % math.pow(2, i) == 0:
                     act_modules += 1
 
             update_indices = act_modules * sizeof_mod
@@ -136,13 +136,16 @@ class CWLayer:
 
             out = nonlinearity(T.dot(new_h, self.wo) + self.bo)
 
-            return new_h, out
+            return (cur_time+1.0), new_h, out
 
-        ([hiddens, outputs], updates) = theano.scan(recurrence,
+        ([times, hiddens, outputs], updates) = theano.scan(recurrence,
                                             sequences=[x],
-                                            outputs_info=[self.hidden, None])
+                                            outputs_info=[self.time,
+                                                self.hidden, None],
+                                            n_steps=x.shape[0])
         self.out = outputs
-        self.hidden = hiddens[-1]
+        updates.update({self.hidden: hiddens[-1]})
+        updates.update({self.time: times[-1]})
         self.updates = updates
 
         self.params = [self.wh, self.bh, self.wi, self.wo, self.bo]
@@ -152,13 +155,74 @@ class CWLayer:
         self.hidden.set_value(np.zeros(shape).astype(theano.config.floatX))
         self.time.set_value(np.zeros(1).astype(theano.config.floatX))
 
+class GRULayer:
+    def __init__(self, in_size, out_size, cell_size=None, init_size=-1,
+            nonlinearity=T.tanh, in_var=T.matrix(), init_type='uniform'):
+        if not cell_size:
+            cell_size = max(in_size, out_size)
+        x = in_var
+        self.x = x
+
+        b_z = init_weights(cell_size, scale=init_size, init_type=init_type)
+        b_r = init_weights(cell_size, scale=init_size, init_type=init_type)
+        b_h = init_weights(cell_size, scale=init_size, init_type=init_type)
+        b_o = init_weights(out_size, scale=init_size, init_type=init_type)
+
+        W = init_weights((in_size, 3 * cell_size + out_size), scale=init_size,
+                init_type=init_type)
+        U = init_weights((cell_size, 2 * cell_size), scale=init_size,
+                init_type=init_type)
+
+        U_r = init_weights((cell_size, cell_size), scale=init_size,
+                init_type=init_type)
+        U_o = init_weights((cell_size, out_size), scale=init_size,
+                init_type=init_type)
+
+        self.params = [b_z, b_r, b_h, b_o, W, U, U_r, U_o]
+
+        def recurrence(x, h_tm1):
+            inp_result = T.dot(x, W)
+            hid_result = T.dot(h_tm1, U)
+            r_t = T.nnet.sigmoid(inp_result[:cell_size] +
+                    hid_result[:cell_size] + b_r)
+            ht_t = T.tanh(inp_result[(cell_size):(2*cell_size)] +
+                    T.dot((h_tm1*r_t), U_r) + b_h)
+            z_t = T.nnet.sigmoid(inp_result[(2*cell_size):(3*cell_size)] +
+                    hid_result[cell_size:(2*cell_size)] + b_z)
+
+            h_t = ((1.0 - z_t) * h_tm1) + (z_t * ht_t)
+            output = nonlinearity(
+                    inp_result[(3*cell_size):(3*cell_size+out_size)] +
+                    T.dot(h_t, U_o) + b_o)
+
+
+            return h_t, output
+
+        self.hidden = theano.shared(
+                np.zeros(cell_size).astype(theano.config.floatX))
+        ([hiddens, output], updates) = theano.scan(recurrence,
+                                        sequences=[x],
+                                        outputs_info=[self.hidden, None],
+                                        n_steps=x.shape[0])
+
+        self.new_h = hiddens[-1]
+
+
+        self.out = output
+        updates.update({self.hidden: hiddens[-1]})
+        self.updates = updates
+
+    def reset():
+        shape = self.hidden.get_value().shape
+        self.hidden.set_value(np.zeros(shape).astype(theano.config.floatX))
+
 class LSTMLayer:
     '''
         This assumes that in this recurrent net, there is a corresponding output to each input
     '''
     def __init__(self, in_size, out_size, cell_size=None, init_size=-1,
             out_type='sigmoid', in_var=None, out_var=None, verbose=False,
-            mem_bias=1, initialization_type='xavier'):
+            mem_bias=1, initialization_type='uniform'):
         if cell_size == None:
             cell_size = max(in_size, out_size)
         self.in_size = in_size
@@ -175,6 +239,8 @@ class LSTMLayer:
             x = in_var
         if verbose:
             print('Constants have been initalized')
+
+        self.x = x
 
         #Forget gate
         self.W_xf = init_weights((in_size, cell_size),
@@ -417,7 +483,7 @@ def miniRecurrentLearning(x, y, batchSize, learn, predict, verbose=False,
     return train_error
 
 def gen_sine_data(amount=100):
-    x = np.linspace(0, 10, amount).reshape(-1, 1)
+    x = np.linspace(0, 10, amount).reshape(-1, 1).astype(theano.config.floatX)
     y = np.sin(x)
     return x, y
 
@@ -511,7 +577,7 @@ def RNNTest():
 
 def CWRNNTest():
     x, y = gen_sine_data()
-    model = RecurrentLayer(1, 1, hidden_size=10)
+    model = CWLayer(1, 1, 16, 4)
 
     correct = T.matrix()
     out = model.out
@@ -520,12 +586,43 @@ def CWRNNTest():
 
     (storage, grad_updates) = generateRmsProp(model.params, error, alpha=0.01)
 
-    updates = grad_updates + model.updates
-    learn = theano.function([model.x, correct], error, updates=updates)
-    predict = theano.function([model.x], out, updates=model.updates)
+    learn = theano.function([model.x, correct], error, updates=grad_updates)
+    predict = theano.function([model.x], out, updates=model.updates,
+            allow_input_downcast=True)
 
-    for i in range(5000):
-        print(learn(x, y))
+    print(model.wh.get_value())
+
+    for i in range(2):
+        print(model.hidden.get_value())
+        print(predict(np.random.rand(10, 1)))
+        print(model.hidden.get_value())
+
+    plt.plot(x, predict(np.zeros(y.shape)))
+    plt.show()
+
+    return
+
+def GRUTest():
+    x, y = gen_sine_data()
+    model = GRULayer(1, 1, 5, nonlinearity=lambda x:x)
+
+    predict = theano.function([model.x], model.out, updates=model.updates,
+            allow_input_downcast=True)
+
+    y_ = T.matrix()
+    error = T.mean(T.sum(T.sqr(model.out - y_), axis=1))
+
+    (storage, gradUpdates) = generateRmsProp(model.params, error, alpha=0.01)
+
+    updates = model.updates + gradUpdates
+
+    learn = theano.function([model.x, y_], error, updates=gradUpdates)
+
+    for i in range(10):
+        print(model.hidden.get_value())
+        (predict(np.zeros((100, 1))))
+        print(model.hidden.get_value())
+
 
     plt.plot(x, predict(x))
     plt.show()
