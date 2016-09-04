@@ -11,3 +11,8 @@ autoencoder.pkl
 *.wav
 .vimrc
 tags
+
+#EE bib files
+EE*
+
+!EE.tex

@@ -151,7 +151,7 @@ class CWLayer:
         self.out = outputs
         updates.update({self.hidden: hiddens[-1]})
         updates.update({self.time: times[-1]})
-        self.updates = updates
+        self.updates = [(self.hidden, hiddens[-1]), (self.time, times[-1])]
 
         self.params = [self.wh, self.bh, self.wi, self.wo, self.bo]
 
@@ -215,7 +215,7 @@ class GRULayer:
 
         self.out = output
         updates.update({self.hidden: hiddens[-1]})
-        self.updates = updates
+        self.updates = [(self.hidden, hiddens[-1])]
 
     def reset():
         shape = self.hidden.get_value().shape
@@ -228,18 +228,17 @@ class LSTMLayer:
     def __init__(self, in_size, out_size, cell_size=None, init_size=-1,
             out_type='sigmoid', in_var=None, out_var=None, verbose=False,
             mem_bias=1, initialization_type='uniform'):
-        if cell_size == None:
+        if cell_size is None:
             cell_size = max(in_size, out_size)
         self.in_size = in_size
         self.out_size = out_size
         self.cell_size = cell_size
-        self.C = theano.shared(value=np.zeros((1, cell_size))
-                .astype(theano.config.floatX), name='LongTerm')
-        self.h = theano.shared(value=np.zeros((1, out_size))
-                .astype(theano.config.floatX), name='Previous Prediction')
-        large_bias = mem_bias
+        self.C = theano.shared(value=np.zeros((cell_size,))
+                .astype(theano.config.floatX), name='Longterm Cell')
+        self.h = theano.shared(value=np.zeros((cell_size,))
+                .astype(theano.config.floatX), name='Shortterm Cell')
         if in_var == None:
-            x = T.matrix(name='input example')
+            x = T.matrix(name='Input Matrix')
         else:
             x = in_var
         if verbose:
@@ -247,98 +246,103 @@ class LSTMLayer:
 
         self.x = x
 
-        #Forget gate
-        self.W_xf = init_weights((in_size, cell_size),
-                init_type=initialization_type, scale=init_size)
-        self.b_f = init_weights((1, cell_size),
-                init_type=initialization_type, scale=init_size)
-        self.W_cf = init_weights((cell_size, cell_size),
-                init_type=initialization_type, scale=init_size)
-        self.W_hf = init_weights((out_size, cell_size),
-                init_type=initialization_type, scale=init_size)
+        self.W = init_weights((in_size, cell_size * 4),
+                init_type=initialization_type, scale=init_size,
+                name='x to cell weights')
+        self.U = init_weights((cell_size, cell_size * 2),
+                init_type=initialization_type, scale=init_size,
+                name='cell to gate weights')
+        self.W_h = init_weights((cell_size, cell_size * 4),
+                init_type=initialization_type, scale=init_size,
+                name='hidden to cell weights')
 
-#        forget = T.nnet.sigmoid(T.dot(self.h, self.W_hf) + T.dot(self.C, self.W_cf) + T.dot(self.x, self.W_xf) + self.b_f)
+        # Order of rows:
+        #   Input Gate, Forget Gate, Memory Generation, Hidden Generation
+        #   Output Generation (not based on hidden)
+
+
+        #Forget gate
+        self.b_f = init_weights(cell_size,
+                init_type=initialization_type, scale=init_size,
+                name='forget gate bias')
 
         #Memories
-        self.W_hm = init_weights((out_size, cell_size),
-                init_type=initialization_type, scale=init_size)
-        self.W_xm = init_weights((in_size, cell_size),
-                init_type=initialization_type, scale=init_size)
-        self.b_m = init_weights((1, cell_size),
-                init_type='bias', scale=mem_bias)
+        self.b_m = init_weights(cell_size,
+                init_type='bias', scale=mem_bias,
+                name='memory bias')
 
-#        memories = T.tanh(T.dot(self.h, self.W_hm) + T.dot(self.x, self.W_xm) + self.b_m)
         #Remember Gate
-        self.W_hr = init_weights((out_size, cell_size),
-                init_type=initialization_type, scale=init_size)
-        self.W_xr = init_weights((in_size, cell_size),
-                init_type=initialization_type, scale=init_size)
-        self.W_cr = init_weights((cell_size, cell_size),
-                init_type=initialization_type, scale=init_size)
-        self.b_r = init_weights((1, cell_size), init_type='bias',
-                scale=mem_bias)
-
-#        remember = T.nnet.sigmoid(T.dot(self.h, self.W_hr) + T.dot(self.C, self.W_cr) + T.dot(self.x, self.W_xr) + self.b_r)
+        self.b_r = init_weights(cell_size, init_type='bias',
+                scale=mem_bias, name='rem gate bias')
 
         #Output
+        self.W_ho = init_weights((cell_size, out_size),
+                init_type=initialization_type, scale=init_size,
+                name='hidden to out weight')
         self.W_co = init_weights((cell_size, out_size),
-                init_type=initialization_type, scale=init_size)
-        self.W_ho = init_weights((out_size, out_size),
-                init_type=initialization_type, scale=init_size)
+                init_type=initialization_type, scale=init_size,
+                name='cell to out weight')
         self.W_xo = init_weights((in_size, out_size),
-                init_type=initialization_type, scale=init_size)
-        self.b_o = init_weights((1, out_size), init_type='bias',
-                scale=mem_bias)
+                init_type=initialization_type, scale=init_size,
+                name='inp to out weight')
+        self.b_o = init_weights(out_size, init_type=initialization_type,
+                scale=init_size, name='out bias')
 
         #Hidden
-        self.W_ch = init_weights((cell_size, out_size),
-                init_type=initialization_type, scale=init_size)
-        self.W_hh = init_weights((out_size, out_size),
-                init_type=initialization_type, scale=init_size)
-        self.W_xh = init_weights((in_size, out_size),
-                init_type=initialization_type, scale=init_size)
-        self.b_h = init_weights((1, out_size), init_type='bias',
-                scale=mem_bias)
+        self.b_h = init_weights(cell_size, init_type=initialization_type,
+                scale=init_size, name='hidden bias')
 
-        self.params = [self.W_xf, self.W_hf, self.W_cf, self.b_f, self.W_hm, self.W_xm, self.b_m,
-                self.W_hr, self.W_cr, self.W_xr, self.b_r, self.W_co, self.W_ho,
-                self.W_xo, self.b_o, self.W_ch, self.W_hh, self.W_xh, self.b_h]
+        self.params = [self.W, self.U, self.W_h, self.b_f, self.b_m, self.b_r,
+                self.W_ho, self.W_co, self.W_xo, self.b_o, self.b_h]
         if verbose:
             print('Weights have been initalized')
 
+        cell_size = theano.shared(cell_size)
         def recurrence(x, h_tm1, c_tm1):
-            rem = T.nnet.sigmoid(T.dot( h_tm1, self.W_hr) +
-                    T.dot( c_tm1 , self.W_cr) + T.dot( x, self.W_xr) + self.b_r)
-            mem = T.tanh(T.dot( h_tm1, self.W_hm) + T.dot( x, self.W_xm) +
-                    self.b_m)
-            forget = T.nnet.sigmoid(T.dot(h_tm1, self.W_hf) +
-                    T.dot(c_tm1, self.W_cf) + T.dot( x, self.W_xf) + self.b_f)
+            x_to_cell = T.dot(x, self.W)
+            cell_to_gate = T.dot(c_tm1, self.U)
+            hid_to_cell = T.dot(h_tm1, self.W_h)
 
-            z = T.dot(c_tm1 , self.W_co) + T.dot( h_tm1 , self.W_ho) + \
-                T.dot(x, self.W_xo) + self.b_o
-            h_t = T.nnet.sigmoid(T.dot(c_tm1, self.W_ch) +
-                    T.dot(h_tm1, self.W_hh) + T.dot(x, self.W_xh) + self.b_h)
-            if out_type=='sigmoid':
-                out = T.nnet.sigmoid(z)
-            elif out_type=='linear':
-                out = z
-            elif out_type=='softmax':
-                out = T.nnet.softmax(z)
+            rem = T.nnet.sigmoid(x_to_cell[:cell_size]
+                    + cell_to_gate[:cell_size]
+                    + hid_to_cell[:cell_size]
+                    + self.b_r)
+            rem.name = 'Memory Gate'
+            forget = T.nnet.sigmoid(x_to_cell[cell_size:(cell_size*2)]
+                    + cell_to_gate[cell_size:(cell_size*2)]
+                    + hid_to_cell[cell_size:(cell_size*2)]
+                    + self.b_f)
+            forget.name = 'Forget Gate'
+            mem = T.tanh(x_to_cell[(cell_size*2):(cell_size*3)]
+                     + hid_to_cell[(cell_size*2):(cell_size*3)]
+                    + self.b_m)
+            mem.name = 'Memories'
 
-            c_t = self.C * forget + rem * mem
-            return [z, h_t, c_t]
+            h_t = T.tanh(mem) * T.nnet.sigmoid(x_to_cell[(cell_size*3):]
+                                              + hid_to_cell[(cell_size*3):]
+                                              + self.b_h)
 
-        ([actualOutput, hidden, cell_state], _) = theano.scan(fn=recurrence,
-                sequences=x,
-                outputs_info=[None, self.h, self.C],
+            c_t = c_tm1 * forget + rem * mem
+
+            z = T.dot(c_t, self.W_co) + T.dot(h_tm1, self.W_ho) \
+                    + T.dot(x, self.W_xo) + self.b_o
+            return [h_t, c_t, z]
+
+        ([hidden, cell_state, output], updates) = theano.scan(fn=recurrence,
+                sequences=[x],
+                outputs_info=[self.h, self.C, None],
                 n_steps=x.shape[0])
         if verbose:
             print('Recurrence has been set up')
 
         self.hidden = hidden
         self.cell_state = cell_state
-        output = actualOutput.reshape((actualOutput.shape[0], actualOutput.shape[2]))
         self.out = output
+        if out_type == 'sigmoid':
+            self.out = T.nnet.sigmoid(output)
+        if out_type == 'tanh':
+            self.out = T.tanh(output)
+        self.updates = [(self.h, hidden[-1]), (self.C, cell_state[-1])]
 
     def reset(self):
         self.C.set_value(np.zeros(self.C.shape.eval())
@@ -374,12 +378,16 @@ class LSTM():
         self.x = x
         self.y = y
 
-        init_size = kwargs.get('init_size', 1e-10)
+        init_size = kwargs.get('init_size', -1)
         self.layers.append(LSTMLayer(dim[0], dim[1], in_var=x, verbose=False))
+        layer_out_type = 'sigmoid'
         for i in range(1, len(dim) - 1):
-            self.layers.append(LSTMLayer(dim[i], dim[i+1], in_var=self.layers[-1].out, init_size=init_size, out_type='sigmoid'))
-            if i == len(dim)-2:
-                self.layers[-1] = LSTMLayer(dim[i], dim[i+1], in_var=self.layers[-2].out, out_type=out_type, init_size=init_size)
+            if i == len(dim) - 2:
+                layer_out_type = out_type
+            self.layers.append(LSTMLayer(dim[i], dim[i+1],
+                in_var=self.layers[-1].out,
+                init_size=init_size,
+                out_type=layer_out_type))
 
 
         if verbose:
@@ -491,6 +499,31 @@ def gen_sine_data(amount=100):
     x = np.linspace(0, 10, amount).reshape(-1, 1).astype(theano.config.floatX)
     y = np.sin(x)
     return x, y
+
+def LSTMLayerTest():
+    x_dat, y = gen_sine_data()
+    x = T.matrix()
+    updates = []
+    params = []
+    m = LSTMLayer(1, 1, cell_size=7, in_var=x)
+    updates = updates + m.updates
+    params += m.params
+    out = m.out
+
+    # m = LSTMLayer(10, 1, cell_size=7, in_var=m.out)
+    # updates = updates + m.updates
+
+
+    predict = theano.function([x], m.out, updates=updates,
+            allow_input_downcast=True)
+    y_ = T.matrix()
+    error = T.mean(T.sqr(out - y_))
+    print(predict(x_dat[:23]).shape)
+    (storage, grad_updates) = generateRmsProp(params, error, alpha=0.01,
+            verbose=True)
+    learn = theano.function([x, y_], error, updates=grad_updates,
+            allow_input_downcast=True)
+
 
 def LSTMTest():
     x = np.linspace(0, 10, 100)
@@ -630,4 +663,4 @@ def GRUTest():
     plt.show()
 
 if __name__ == "__main__":
-    CWRNNTest()
+    LSTMTest()

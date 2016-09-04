@@ -87,7 +87,8 @@ def reset(params, init_size=0.1, init_range=None):
         p.set_value(np.random.uniform(low=init_range[0], high=init_range[1],
             size=p.shape.eval()).astype(theano.config.floatX))
 
-def init_weights(shape, init_type='uniform', scale=-1, shared_var=True):
+def init_weights(shape, init_type='uniform', scale=-1, shared_var=True,
+        name=None):
     if init_type == 'uniform':
         DEFAULT_SCALE = 0.05
         if scale < 0:
@@ -95,7 +96,7 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True):
         val = np.random.uniform(low=-scale, high=scale, size=shape).astype(
                 theano.config.floatX)
         if shared_var:
-            return theano.shared(val)
+            return theano.shared(val, name=name)
         else:
             return val
 
@@ -108,7 +109,7 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True):
         var = np.random.uniform(low=scale-0.001, high=scale+0.001,
                 size=shape).astype(theano.config.floatX)
         if shared_var:
-            return theano.shared(var)
+            return theano.shared(var, name=name)
         else:
             return var
 
@@ -143,7 +144,7 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True):
                     theano.config.floatX)
         else:
             return theano.shared(np.random.uniform(low=-s, high=s,
-                size=shape).astype(theano.config.floatX))
+                size=shape).astype(theano.config.floatX), name=name)
 
 
 def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8):

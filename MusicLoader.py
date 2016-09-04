@@ -347,7 +347,7 @@ def get_data(index):
     od = od.astype('float32')
 
     data = wav_to_FT(od)
-    scale, data = normalize(data)
+    scale, data = normalize(data, low=0, high=1)
     return scale, data
 
 def EEDataGenerator():
@@ -397,6 +397,8 @@ def EEDataGenerator():
     scale, X_dat = get_data(0)
     X_dat = X_dat[:1024]
     Y_dat = X_dat[:1024]
+
+    #Test RBM
 
     #Test overlapping LSTMs
 
