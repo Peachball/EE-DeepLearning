@@ -355,6 +355,7 @@ def EEDataGenerator():
     import time
     timefile = open('times.txt', 'a')
     MODE = 'FAST_RUN'
+
     def construct_model(layers, m_type='lstm'):
         x = T.matrix()
         y = T.matrix()
@@ -447,14 +448,15 @@ def EEDataGenerator():
 
         start_time = time.clock()
         print("Beginning Training!")
-        train_error = miniRecurrentLearning(X_dat, Y_dat, 50, learn, predict,
-                reset, verbose=True, epochs=5)
+        train_error = miniRecurrentLearning(X_dat, Y_dat, 100, learn, predict,
+                reset, verbose=True, epochs=5, strides=5)
 
         duration = time.clock() - start_time
 
         pickle.dump(train_error, open(name + '.data', 'wb'))
 
-        timefile.write(name + ' took ' + str(duration))
+        timefile.write(name + ' took ' + str(duration) + '\n')
+        timefile.flush()
 
     scale, X_dat = get_data(0)
     X_dat = X_dat[:1024]
