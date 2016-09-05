@@ -391,7 +391,7 @@ def EEDataGenerator():
 
         if m_type == 'lstm':
             model = LSTM(*((1024,) * (layers + 1)), in_var=x, out_var=y,
-                    out_type='linear', init_size=6)
+                    out_type='linear', init_size=-1)
             params = model.params
             updates = model.updates
             out = model.out
@@ -464,18 +464,17 @@ def EEDataGenerator():
 
         return (x, y, params, out, updates, reset)
 
-    def test_model(x, y, params, predict, reset, name):
+    def test_model(x, y, o, params, predict, reset, name):
         error = T.mean(T.sum(T.sqr(y - o), axis=1))
 
         print("Calculating Gradient Updates...")
-        learn_updates = generateVanillaUpdates(params, error, alpha=0.0000001,
+        (storage, learn_updates) = generateAdagrad(params, error, alpha=0.001,
                 verbose=True)
         print("Compiling Learn Function")
         learn = theano.function([x, y], error, updates=learn_updates,
                 mode=MODE, allow_input_downcast=True)
 
         start_time = time.clock()
-        print("Beginning Training!")
         train_error = miniRecurrentLearning(X_dat, Y_dat, 100, learn, predict,
                 reset, verbose=True, epochs=5, strides=5)
 
@@ -505,7 +504,7 @@ def EEDataGenerator():
 
         predict = theano.function([x], o, updates=updates,
                 allow_input_downcast=True)
-        test_model(x, y, params, predict, reset, str(i+1) + 'LayerLSTM')
+        test_model(x, y, o, params, predict, reset, str(i+1) + 'LayerLSTM')
 
     #Test RNNs
     for i in range(3):
@@ -514,7 +513,7 @@ def EEDataGenerator():
         predict = theano.function([x], o, updates=updates,
                 allow_input_downcast=True)
 
-        test_model(x, y, params, predict, reset, str(i+1) + 'LayerRNN')
+        test_model(x, y, o, params, predict, reset, str(i+1) + 'LayerRNN')
 
     #Test GRUS
     for i in range(3):
@@ -523,7 +522,7 @@ def EEDataGenerator():
         predict = theano.function([x], updates=updates,
                 allow_input_downcast=True)
 
-        test_model(x, y, params, predict, reset, str(i+1) + 'LayerGRU')
+        test_model(x, y, o, params, predict, reset, str(i+1) + 'LayerGRU')
 
     #Test CW
     for i in range(3):
@@ -532,7 +531,7 @@ def EEDataGenerator():
         predict = theano.function([x], updates=updates,
                 allow_input_downcast=True)
 
-        test_model(x, y, params, predict, reset, str(i+1) + 'LayerCWRNN')
+        test_model(x, y, o, params, predict, reset, str(i+1) + 'LayerCWRNN')
 
 if __name__ == '__main__':
     EEDataGenerator()
