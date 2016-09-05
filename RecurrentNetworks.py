@@ -311,7 +311,7 @@ class LSTMLayer:
         if out_type == 'sigmoid':
             self.out = T.clip(T.nnet.sigmoid(output), 0.001, 0.999)
         if out_type == 'tanh':
-            self.out = T.tanh(output)
+            self.out = T.clip(T.tanh(output), -0.999, 0.999)
         self.updates = updates
 
     def getOutput(self, x):
@@ -381,7 +381,7 @@ class LSTM():
         out_type = kwargs.get('out_type', 'sigmoid')
         self.layers = []
         verbose = kwargs.get('verbose', False)
-        init_size = kwargs.get('init_size', 0.01)
+        init_size = kwargs.get('init_size', 0.001)
         x = kwargs.get("in_var", T.matrix('Input'))
         y = kwargs.get("out_var", T.matrix('Output'))
         self.x = x

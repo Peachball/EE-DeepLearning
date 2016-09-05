@@ -281,6 +281,7 @@ def generateVanillaUpdates(params, error, alpha=0.01, verbose=True):
         count += 1
         print("\r{}/{} Gradients done".format(count, len(params)), end="")
     updates = [(p, p - g * alpha) for p, g in zip(params, grad)]
+    print("")
     return updates
 
 def generateMomentumUpdates(params, error, alpha=0.01, momentum=0.5):
