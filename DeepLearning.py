@@ -147,7 +147,7 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True,
                 size=shape).astype(theano.config.floatX), name=name)
 
 
-def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8, verbose=False):
+def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8, verbose=False, clip=(-5, 5)):
     updates = []
     history = []
 
@@ -160,7 +160,10 @@ def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8, verbose=False):
 
         new_g = totalG + T.sqr(grad)
         updates.append((totalG, new_g))
-        updates.append((p, p - grad / (T.sqrt(new_g) + epsilon) * alpha))
+        deltaw = grad / (T.sqrt(new_g) + epsilon) * alpha
+        if isinstance(clip, tuple):
+            deltaw = T.clip(deltaw, clip[0], clip[1])
+        updates.append((p, p - deltaw))
 
         history.append(totalG)
         count += 1
@@ -270,10 +273,13 @@ def generateRmsProp(params, error, alpha=0.01, decay=0.9, fudge=1e-3,
     if verbose: print('')
     return (r + v, updates)
 
-def generateVanillaUpdates(params, error, alpha=0.01):
+def generateVanillaUpdates(params, error, alpha=0.01, verbose=True):
     grad = []
+    count = 0
     for p in params:
         grad.append(T.grad(error, p))
+        count += 1
+        print("\r{}/{} Gradients done".format(count, len(params)), end="")
     updates = [(p, p - g * alpha) for p, g in zip(params, grad)]
     return updates
 
