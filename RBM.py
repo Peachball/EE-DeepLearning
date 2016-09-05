@@ -63,6 +63,12 @@ class RBMLayer:
         [v1, v1_sig, v1_bin] = self.getVisible(h_bin)
         return v1_bin
 
+    def mean_vhv(self, v):
+        [h, h_sig, h_bin] = self.getHidden(v)
+        [v, v_sig, v_bin] = self.getVisible(h_bin)
+        return v_sig
+
+    #Determine F(v, h) using only v
     def free_energy(self, v):
         bias = T.dot(v, self.b)
 
@@ -86,7 +92,6 @@ class RBMLayer:
             _, _, new_v = self.getVisible(new_hid)
             return new_hid, new_v
 
-        print(persistent)
         gibbsSample(persistent)
         ([_, chain], updates) = theano.scan(gibbsSample,
                 outputs_info=[None, persistent], n_steps=k)
