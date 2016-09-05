@@ -468,7 +468,7 @@ def EEDataGenerator():
         error = T.mean(T.sum(T.sqr(y - o), axis=1))
 
         print("Calculating Gradient Updates...")
-        (_, learn_updates) = generateAdagrad(params, error, alpha=0.0001,
+        learn_updates = generateVanillaUpdates(params, error, alpha=0.0000001,
                 verbose=True)
         print("Compiling Learn Function")
         learn = theano.function([x, y], error, updates=learn_updates,
@@ -497,6 +497,25 @@ def EEDataGenerator():
 
     #Test overlapping RNNs
 
+
+    #Test lstms
+    for i in range(1,3):
+        print("Constructing " + str(i+1) + " layer lstm")
+        x, y, params, o, updates, reset = construct_model(i+1, m_type='lstm')
+
+        predict = theano.function([x], o, updates=updates,
+                allow_input_downcast=True)
+        test_model(x, y, params, predict, reset, str(i+1) + 'LayerLSTM')
+
+    #Test RNNs
+    for i in range(3):
+        print("Constructing " + str(i+1) + " layer rnn")
+        x, y, params, o, updates, reset = construct_model(i+1, m_type='rnn')
+        predict = theano.function([x], o, updates=updates,
+                allow_input_downcast=True)
+
+        test_model(x, y, params, predict, reset, str(i+1) + 'LayerRNN')
+
     #Test GRUS
     for i in range(3):
         print("Constructing " + str(i+1) + " layer GRU")
@@ -515,24 +534,5 @@ def EEDataGenerator():
 
         test_model(x, y, params, predict, reset, str(i+1) + 'LayerCWRNN')
 
-    #Test RNNs
-    for i in range(3):
-        print("Constructing " + str(i+1) + " layer rnn")
-        x, y, params, o, updates, reset = construct_model(i+1, m_type='rnn')
-        predict = theano.function([x], o, updates=updates,
-                allow_input_downcast=True)
-
-        test_model(x, y, params, predict, reset, str(i+1) + 'LayerRNN')
-
-    #Test lstms
-    for i in range(3):
-        print("Constructing " + str(i+1) + " layer lstm")
-        x, y, params, o, updates, reset = construct_model(i+1, m_type='lstm')
-
-        predict = theano.function([x], o, updates=updates,
-                allow_input_downcast=True)
-        test_model(x, y, params, predict, str(i+1) + 'LayerLSTM')
-
-
 if __name__ == '__main__':
-    testCWRNN()
+    EEDataGenerator()
