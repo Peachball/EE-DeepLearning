@@ -47,10 +47,13 @@ class RecurrentLayer:
                 sequences=x, outputs_info=[None, self.hidden], n_steps=x.shape[0])
 
         self.out = out
-        self.updates = updates
-        self.hidden = hidden[-1]
+        self.updates = [(self.hidden, hidden[-1])]
 
         self.params = [w_ih, w_hh, b_h, w_io, w_ho, b_o]
+
+    def reset(self):
+        shape = self.hidden.get_value().shape
+        self.hidden.set_value(np.zeros(shape).astype(theano.config.floatX))
 
 class RNN:
 
@@ -82,6 +85,11 @@ class RNN:
             updates = updates + l.updates
             self.params = self.params + l.params
         self.updates = updates
+        self.layers = layers
+
+    def reset(self):
+        for l in self.layers:
+            l.reset()
 
 class CWLayer:
     def __init__(self, input_size, output_size, hidden_units, modules,
@@ -261,17 +269,17 @@ class LSTMLayer:
 
         #Forget gate
         self.b_f = init_weights(cell_size,
-                init_type=initialization_type, scale=init_size,
+                init_type='bias', scale=mem_bias,
                 name='forget gate bias')
 
         #Memories
         self.b_m = init_weights(cell_size,
-                init_type='bias', scale=mem_bias,
+                init_type=initialization_type, scale=init_size,
                 name='memory bias')
 
         #Remember Gate
-        self.b_r = init_weights(cell_size, init_type='bias',
-                scale=mem_bias, name='rem gate bias')
+        self.b_r = init_weights(cell_size, init_type=initialization_type,
+                scale=init_size, name='rem gate bias')
 
         #Output
         self.W_ho = init_weights((cell_size, out_size),
@@ -301,7 +309,7 @@ class LSTMLayer:
 
         self.out = output
         if out_type == 'sigmoid':
-            self.out = T.nnet.sigmoid(output)
+            self.out = T.clip(T.nnet.sigmoid(output), 0.001, 0.999)
         if out_type == 'tanh':
             self.out = T.tanh(output)
         self.updates = updates
@@ -381,7 +389,7 @@ class LSTM():
 
         init_size = kwargs.get('init_size', -1)
         self.layers.append(LSTMLayer(dim[0], dim[1], in_var=x, verbose=False))
-        layer_out_type = 'sigmoid'
+        layer_out_type = 'tanh'
         for i in range(1, len(dim) - 1):
             if i == len(dim) - 2:
                 layer_out_type = out_type
