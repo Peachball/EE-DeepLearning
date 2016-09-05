@@ -150,6 +150,10 @@ class RBMLayer:
                 train_error.append(error)
         return train_error
 
+class RNNRBMLayer:
+    def __init__(self, in_size, v_size, hidden_size):
+        pass
+
 def RBMTester():
     theano.config.floatX='float32'
     images, labels = readMNISTData(1000)

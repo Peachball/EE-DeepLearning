@@ -59,7 +59,6 @@ class RNN:
         verbose = kwargs.get('verbose', False)
 
         x = kwargs.get('in_var', T.matrix("input"))
-        y = kwargs.get('out_var', T.matrix('output'))
         layers = []
         layers.append(RecurrentLayer(dim[0], dim[1], init_size = init_size, in_var=x))
         out_type = kwargs.get('out_type', 'sigmoid')
@@ -86,11 +85,10 @@ class RNN:
 
 class CWLayer:
     def __init__(self, input_size, output_size, hidden_units, modules,
-            in_var=T.matrix(), out_var=T.matrix(), init_type='xavier',
+            in_var=T.matrix(), init_type='xavier',
             init_size=-1, nonlinearity=T.tanh, h_nonlinearity=T.tanh,
             periods=None):
         x = in_var
-        y = out_var
         params = []
 
         if periods is None:
@@ -226,7 +224,7 @@ class LSTMLayer:
         This assumes that in this recurrent net, there is a corresponding output to each input
     '''
     def __init__(self, in_size, out_size, cell_size=None, init_size=-1,
-            out_type='sigmoid', in_var=None, out_var=None, verbose=False,
+            out_type='sigmoid', in_var=None, verbose=False,
             mem_bias=1, initialization_type='uniform'):
         if cell_size is None:
             cell_size = max(in_size, out_size)

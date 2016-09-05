@@ -229,7 +229,7 @@ def testRBM():
     y = T.matrix()
 
     persistent = theano.shared(np.zeros((100, 1024)).astype(theano.config.floatX))
-    adj_cost, grad_updates = rbm.cost_updates(lr=0.01, persistent=persistent, k=1)
+    adj_cost, grad_updates = rbm.cost_updates(lr=0.001, persistent=persistent, k=1)
 
     mse = T.mean(T.sum(T.sqr(rbm.mean_vhv(rbm.x) - y), axis=1))
 
@@ -248,6 +248,26 @@ def testRBM():
             'test.wav')
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
+
+def testCWRNN():
+    scale, data = get_data(0)
+    data.astype('float32')
+    cw = CWLayer(1024, 1024, 1024, 12, nonlinearity=lambda x:x)
+
+    predict = theano.function([cw.x], cw.out, updates=cw.updates,
+            allow_input_downcast=True)
+
+    y = T.matrix()
+    error = T.mean(T.sum(T.sqr(cw.out - y), axis=1))
+
+    (storage, grad_updates) = generateAdagrad(cw.params, error, alpha=0.01)
+
+    learn = theano.function([cw.x, y], error, updates=grad_updates,
+            allow_input_downcast=True)
+    reset = cw.reset
+
+    train_error = miniRecurrentLearning(data, data, 100, learn, predict, reset,
+            verbose=True, strides=10)
 
 def testConvNet():
     data = convertMusicFile(0)
@@ -513,4 +533,4 @@ def EEDataGenerator():
 
 
 if __name__ == '__main__':
-    testRBM()
+    testCWRNN()
