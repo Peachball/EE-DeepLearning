@@ -129,6 +129,20 @@ to be useless. Also, this addition of a forget gate intuitively, as useless
 memory should be discarded. The LSTM's in this paper will be assumed to have
 forget gates.
 
+The LSTM accuracy can also be further improved through adding ``peephole
+connections''~\cite{lstmpeep}. These are simply a connection between the memory
+cell of the LSTM to the forget gates and remember gates. According to Gers'
+paper, through these peep hole connections, the LSTM can model short term
+changes and fluctuations more accurately.
+
+During training of LSTM's, a notable technique that will be used it large
+initialization of the forget gate bias, which if not proper initialized, will
+cause problems with the gradient flow of the LSTM~\cite{lstmbias}. Through
+initializing a large forget gate, Jozefowicz and others have demonstrated that
+this enables LSTM's to learn long term dependencies better, which will also be
+used within this paper~\cite{lstmbias}. In this manner, the LSTM mentioned in
+this paper will be trained faster.
+
 
 \subsection{Gated Recurrent Units}
 Another variation off of recurrent networks are gated recurrent units, which
@@ -139,7 +153,9 @@ $$h_t = (1 - z) * h_t + h'_t $$
 z is a unit that the model calculates, and is bounded between 0 and 1 with the
 sigmoid activation function. As a result, this type of network also has been
 found to have long term memories, making it comparable to the performance of
-LSTM's. Thus, this model will also be tested against LSTM's in its performance.
+LSTM's. These models also seem to be faster to compute than LSTM's, due to their
+lower number of weights. Thus, this model will also be tested against LSTM's in
+its performance.
 
 
 \subsection{Clockwork Recurrent Neural Network}
@@ -187,7 +203,9 @@ each pixel value with the corresponding filter value.
 \end{figure}
 Convolution neural networks are typically used for computer vision technologies,
 as elements in an image are generally more related to each other if they are
-closer to each other. 
+closer to each other. However, convolutional networks can also be used in time
+series analysis, as demonstrated by the research done by
+Abdel-Hamid~\cite{convrnn}.
 
 
 \subsection{Autoencoder}
@@ -225,9 +243,6 @@ Furthermore, random initialization with a sigmoid activation function causes
 problems, as typically the activation value will saturate, due to how the mean
 value for a sigmoid function is 0.5. What this means is that since the sigmoid
 function has a small gradient around x = 0, once
-
-\subsection{LSTM Techniques}
-
 
 \subsection{Rprop Trainer}
 A training method that was considered was RPROP, originally devised by
@@ -284,12 +299,13 @@ learn long term patterns within the data, due to the gradient not being
 calculated with respect to all data samples.
 
 
-\subsection{Real Time Recurrent Learning}
-Although back propagation through time is simple to implement, it is
-expensive to calculate, as it requires a complete sequence of data. However,
-another derivation of the derivative of the cost function gives real time
-recurrent learning, which is only dependent on some stored variables, and one
-data sample. However, implementation of this algorithm is significantly 
+%\subsection{Real Time Recurrent Learning}
+%Although back propagation through time is simple to implement, it is
+%expensive to calculate, as it requires a complete sequence of data. However,
+%another derivation of the derivative of the cost function gives real time
+%recurrent learning, which is only dependent on some stored variables, and one
+%data sample. However, implementation of this algorithm requires manual
+%differention of 
 
 \subsection{Implementational Details}
 Python and Theano are used to test these models. Theano is considered to be very
@@ -394,6 +410,10 @@ check https://github.com/Peachball/EE-DeepLearning.
 		Gers, Schraudolph, and Schmidhuber. ``Learning Precise Timing with LSTM
 		Recurrent Networks.'' \textit{Journal of Machine Learning Research},
 		2002, pag. 115-143. Web. 3 Sept. 2016.
+
+	\bibitem{lstmbias}
+		Jozefowicz, Zaremba, and Sutskever. ``An Empirical Exploration of Neural
+		Network Architectures.'' \textit{JMLR}, vol 37. Web. 4 Sept. 2016.
 \end{thebibliography}
 
 \end{document}

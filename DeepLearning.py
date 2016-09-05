@@ -381,7 +381,6 @@ class Layer:
 
         if in_var==None:
             x = T.matrix('Input')
-            print('hello')
         else:
             x = in_var
 
@@ -557,6 +556,37 @@ class ConvolutionalAutoEncoder:
         self.params = []
         for l in layers:
             self.params += l.params
+
+class BNLayer:
+    """
+        Batch Normalization layer, as descrbed by the original paper
+    """
+    def __init__(self, shape, in_var=T.matrix(), axis=0):
+        """
+            Shape contains all dimensions excluding first one
+        """
+        if isinstance(shape, tuple):
+            raise Exception("Invalid shape for BN Layer")
+        self.x = in_var
+        x = in_var
+        mean = T.mean(x, axis=axis)
+        variance = T.sqr(x - mean)
+
+        self.mean = mean
+        self.variance = variance
+
+        self.beta = init_weights(shape, init_type='uniform')
+        self.gamma = init_weights(shape, init_type='uniform')
+
+        self.params = [self.beta, self.gamma]
+
+    def getTrainingOutput(self):
+        x_ = (self.x - mean) / T.sqrt(variance)
+        return x_ * self.gamma + self.beta
+
+    def getInferenceOutput(self, means, variance):
+        x_ = (self.x - means) / T.sqrt(variance)
+        return x_ * self.gamma + self.beta
 
 
 class FFClassifier:

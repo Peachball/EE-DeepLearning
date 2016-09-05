@@ -59,7 +59,6 @@ class RNN:
         verbose = kwargs.get('verbose', False)
 
         x = kwargs.get('in_var', T.matrix("input"))
-        y = kwargs.get('out_var', T.matrix('output'))
         layers = []
         layers.append(RecurrentLayer(dim[0], dim[1], init_size = init_size, in_var=x))
         out_type = kwargs.get('out_type', 'sigmoid')
@@ -86,11 +85,10 @@ class RNN:
 
 class CWLayer:
     def __init__(self, input_size, output_size, hidden_units, modules,
-            in_var=T.matrix(), out_var=T.matrix(), init_type='xavier',
+            in_var=T.matrix(), init_type='xavier',
             init_size=-1, nonlinearity=T.tanh, h_nonlinearity=T.tanh,
             periods=None):
         x = in_var
-        y = out_var
         params = []
 
         if periods is None:
@@ -226,7 +224,7 @@ class LSTMLayer:
         This assumes that in this recurrent net, there is a corresponding output to each input
     '''
     def __init__(self, in_size, out_size, cell_size=None, init_size=-1,
-            out_type='sigmoid', in_var=None, out_var=None, verbose=False,
+            out_type='sigmoid', in_var=None, verbose=False,
             mem_bias=1, initialization_type='uniform'):
         if cell_size is None:
             cell_size = max(in_size, out_size)
@@ -297,7 +295,19 @@ class LSTMLayer:
         if verbose:
             print('Weights have been initalized')
 
-        cell_size = theano.shared(cell_size)
+        updates, output = self.getOutput(x)
+        if verbose:
+            print('Recurrence has been set up')
+
+        self.out = output
+        if out_type == 'sigmoid':
+            self.out = T.nnet.sigmoid(output)
+        if out_type == 'tanh':
+            self.out = T.tanh(output)
+        self.updates = updates
+
+    def getOutput(self, x):
+        cell_size = self.cell_size
         def recurrence(x, h_tm1, c_tm1):
             x_to_cell = T.dot(x, self.W)
             cell_to_gate = T.dot(c_tm1, self.U)
@@ -328,21 +338,12 @@ class LSTMLayer:
                     + T.dot(x, self.W_xo) + self.b_o
             return [h_t, c_t, z]
 
-        ([hidden, cell_state, output], updates) = theano.scan(fn=recurrence,
+        ([hidden, cell_state, output], _) = theano.scan(fn=recurrence,
                 sequences=[x],
                 outputs_info=[self.h, self.C, None],
                 n_steps=x.shape[0])
-        if verbose:
-            print('Recurrence has been set up')
-
-        self.hidden = hidden
-        self.cell_state = cell_state
-        self.out = output
-        if out_type == 'sigmoid':
-            self.out = T.nnet.sigmoid(output)
-        if out_type == 'tanh':
-            self.out = T.tanh(output)
-        self.updates = [(self.h, hidden[-1]), (self.C, cell_state[-1])]
+        updates = [(self.h, hidden[-1]), (self.C, cell_state[-1])]
+        return updates, output
 
     def reset(self):
         self.C.set_value(np.zeros(self.C.shape.eval())
@@ -397,8 +398,7 @@ class LSTM():
         #Defining updates for all layers:
         layerUpdates = []
         for l in self.layers:
-            layerUpdates.append((l.C, l.cell_state[-1]))
-            layerUpdates.append((l.h, l.hidden[-1]))
+            layerUpdates += l.updates
 
         #Define prediction:
         prediction = self.layers[-1].out

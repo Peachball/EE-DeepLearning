@@ -223,23 +223,51 @@ def testAutoEncoder():
         open("test.wav", "wb"))
 
 def testRBM():
-    data = convertMusicFile(0)
-    rbm = RBMLayer(1000, 900, persistent_updatesize=500)
-    scaleFactor = data.max()
-    data = data / data.max()
+    scale, data = get_data(0)
+    rbm = RBMLayer(1024, 900)
 
     y = T.matrix()
 
-    cdupdates = rbm.CDUpdates(rbm.in_var, alpha=0.0001)
+    persistent = theano.shared(np.zeros((100, 1024)).astype(theano.config.floatX))
+    adj_cost, grad_updates = rbm.cost_updates(lr=0.001, persistent=persistent, k=1)
 
-    mse = T.mean(T.sqr((rbm.out - y) * scaleFactor))
+    mse = T.mean(T.sum(T.sqr(rbm.mean_vhv(rbm.x) - y), axis=1))
 
-    learn = theano.function([rbm.in_var, y], mse, updates=cdupdates)
+    learn = theano.function([rbm.x, y], mse, updates=grad_updates,
+            allow_input_downcast=True)
 
-    train_error = rbm.miniBatch(learn, data, verbose=True, epochs=10)
+    reconstruct = theano.function([rbm.x], rbm.mean_vhv(rbm.x),
+            allow_input_downcast=True)
 
+    train_error = miniBatchLearning(data, data, 250, learn, verbose=True,
+            epochs=10)
+    print("generating files")
+    generateMusicFile(FT_to_wav(scaleBack(data, scale)),
+            'original.wav')
+    generateMusicFile(FT_to_wav(scaleBack(reconstruct(data), scale)),
+            'test.wav')
     plt.plot(np.arange(len(train_error)), train_error)
     plt.show()
+
+def testCWRNN():
+    scale, data = get_data(0)
+    data.astype('float32')
+    cw = CWLayer(1024, 1024, 1024, 12, nonlinearity=lambda x:x)
+
+    predict = theano.function([cw.x], cw.out, updates=cw.updates,
+            allow_input_downcast=True)
+
+    y = T.matrix()
+    error = T.mean(T.sum(T.sqr(cw.out - y), axis=1))
+
+    (storage, grad_updates) = generateAdagrad(cw.params, error, alpha=0.01)
+
+    learn = theano.function([cw.x, y], error, updates=grad_updates,
+            allow_input_downcast=True)
+    reset = cw.reset
+
+    train_error = miniRecurrentLearning(data, data, 100, learn, predict, reset,
+            verbose=True, strides=10)
 
 def testConvNet():
     data = convertMusicFile(0)
@@ -507,4 +535,4 @@ def EEDataGenerator():
 
 
 if __name__ == '__main__':
-    EEDataGenerator()
+    testCWRNN()
