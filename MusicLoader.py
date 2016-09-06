@@ -56,13 +56,13 @@ def wav_to_FT(data, chunk_size=1024):
         print("Warning: output data will not have the desired number of"
               "columns")
 
-    output = np.zeros((data.size * 2 / chunk_size, chunk_size))
+    output = np.zeros((data.size * 2 // chunk_size, chunk_size))
 
     row_counter = 0
     for i in range(0, data.shape[0], chunk_size // (2 * channels)):
         row = []
         for j in range(channels):
-            comp = np.fft.fft(data[i:i + (chunk_size / (2 * channels)), j])
+            comp = np.fft.fft(data[i:i + (chunk_size // (2 * channels)), j])
             row = row + list(comp.real) + list(comp.imag)
         if len(row) != chunk_size:
             break
