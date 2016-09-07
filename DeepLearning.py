@@ -147,7 +147,8 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True,
                 size=shape).astype(theano.config.floatX), name=name)
 
 
-def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8, verbose=False, clip=(-5, 5)):
+def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8, verbose=False,
+        clip=None):
     updates = []
     history = []
 
@@ -782,26 +783,39 @@ def NNTester():
     plt.savefig("test.png")
     plt.show()
 
-def normalize(x, dim=0, low=-1, high=1, scaleFactor=None):
+def normalize(x, dim=0, low=-1, high=1, scaleFactor=None, type='range'):
     if low >= high:
         raise Exception("Bad boundaries")
-    if scaleFactor == None:
+    if type=='range':
+        if scaleFactor == None:
+            mins = x.min(axis=dim)
+            maxes = x.max(axis=dim)
+            eq = np.equal(mins, maxes)
+            r = np.where(eq, np.ones(maxes.shape), maxes - mins)
+        if isinstance(scaleFactor, tuple):
+            maxes, mins = scaleFactor
+        return ((maxes, mins),
+                (((x - mins) / (r) * (high - low)) + low))
+
+    if type=='gauss':
+        if scaleFactor == None:
+            means = x.mean(axis=dim)
+            var = np.maximum(np.square(x - means).sum(axis=dim), 1e-8)
+        if isinstance(scaleFactor, tuple):
+            means, var = scaleFactor
+        return ((means, var), ((x - means) / np.sqrt(var)))
+
+def scaleBack(x, scale, dim=0, type='range'):
+    if type == 'range':
+        high, low = scale
         mins = np.min(x, axis=dim)
         maxes = np.max(x, axis=dim)
         eq = np.equal(mins, maxes)
         range = np.where(eq, np.ones(maxes.shape), maxes - mins)
-    else:
-        maxes, mins = scaleFactor
-    return ((maxes, mins),
-            (((x - mins) / (range) * (high - low)) + low))
-
-def scaleBack(x, scale, dim=0):
-    high, low = scale
-    mins = np.min(x, axis=dim)
-    maxes = np.max(x, axis=dim)
-    eq = np.equal(mins, maxes)
-    range = np.where(eq, np.ones(maxes.shape), maxes - mins)
-    return (((x - mins) / (range) * (high - low)) + low)
+        return (((x - mins) / (range) * (high - low)) + low)
+    if type == 'gauss':
+        means, var = scale
+        return (x * np.sqrt(var) + means)
 
 from PIL import Image
 
