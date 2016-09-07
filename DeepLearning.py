@@ -152,7 +152,11 @@ def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8, verbose=False,
     updates = []
     history = []
 
+    if verbose:
+        print("Calculating gradients")
     gradients = T.grad(error, params)
+    if verbose:
+        print("Done with gradients")
     count = 0
     for p, grad in zip(params, gradients):
         shape = p.get_value().shape
@@ -167,9 +171,6 @@ def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8, verbose=False,
         updates.append((p, p - deltaw))
 
         history.append(totalG)
-        count += 1
-        if verbose: print("\rGradient {}/{} Done".format(count, len(params)),
-                end='')
 
     if verbose: print('')
     return (history, updates)
@@ -800,7 +801,7 @@ def normalize(x, dim=0, low=-1, high=1, scaleFactor=None, type='range'):
     if type=='gauss':
         if scaleFactor == None:
             means = x.mean(axis=dim)
-            var = np.maximum(np.square(x - means).sum(axis=dim), 1e-8)
+            var = np.maximum(np.square(x - means).mean(axis=dim), 1e-8)
         if isinstance(scaleFactor, tuple):
             means, var = scaleFactor
         return ((means, var), ((x - means) / np.sqrt(var)))

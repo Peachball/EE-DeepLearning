@@ -30,7 +30,7 @@ def convertMusicFile(index, inputsize=1000):
     return data
 
 def generateMusicFile(arr, f):
-    data = arr.reshape(arr.size/2, 2).astype('int16')
+    data = arr.reshape(arr.size//2, 2).astype('int16')
     wavUtil.write(f, 44100, data)
 
 def testPrediction(predict):
@@ -375,8 +375,54 @@ def get_data(index):
     od = od.astype('float32')
 
     data = wav_to_FT(od)
-    scale, data = normalize(data, low=0, high=1)
+    scale, data = normalize(data, type='gauss')
     return scale, data
+
+def trainLSTM():
+    lstm = LSTM(1024, 1024, out_type='linear',
+            init_size=0.001, verbose=True)
+    y_ = T.matrix()
+    error = T.mean(T.sum(T.sqr(lstm.out - y_), axis=1))
+    (storage, upd) = generateRmsProp(lstm.params, error, alpha=1e-5, verbose=True)
+
+    predict = lstm.predict
+    reset = lstm.reset
+
+
+    print("Loading data")
+    scale, data = get_data(0)
+    X_dat = data[:-1]
+    Y_dat = data[1:]
+
+    model_name = 'gaussbiglstm'
+    def save():
+        saveParams(lstm.params, model_name)
+        return
+
+    def load():
+        loadParams(lstm.params, model_name + '.npz')
+        return
+
+    def generate(lame=True, name='test.wav'):
+        if lame:
+            song = predict(X_dat[:1000])
+            generateMusicFile(FT_to_wav(scaleBack(song, scale)), name)
+        else:
+            song = np.zeros((10000, 1024)).astype('float32')
+            song[:1] = X_dat[:1]
+            for i in range(1, 10000):
+                song[i:i+1] = predict(song[i-1:i])
+                print("\r{} of the way there".format(i/10000), end="")
+            generateMusicFile(FT_to_wav(scaleBack(song, scale)), name)
+            print("")
+        return
+
+    learn = theano.function([lstm.x, y_], error, updates=upd,
+            allow_input_downcast=True)
+    train_error = miniRecurrentLearning(X_dat, Y_dat, 20, learn, predict, reset,
+            verbose=True, epochs=10, save=save, saveiters=300, strides=5)
+
+    pickle.dump(train_error, open('lstm_train.data', 'wb'))
 
 def EEDataGenerator():
     #Build models
@@ -534,4 +580,4 @@ def EEDataGenerator():
         test_model(x, y, o, params, predict, reset, str(i+1) + 'LayerCWRNN')
 
 if __name__ == '__main__':
-    EEDataGenerator()
+    trainLSTM()
