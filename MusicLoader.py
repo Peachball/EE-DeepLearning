@@ -14,8 +14,22 @@ import random
 
 SAMPLE_RATE = 44100
 
+def downloadMusicPlayList(outdir, playlist_url, num=50):
+    import youtube_dl
+    for i in range(num):
+        ydl_opts = {'format': 'bestaudio/best',
+                    'postprocessors': [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'wav',
+                        }],
+                    'outtmpl' : outdir + '%(playlist_index)s.$(ext)s',
+                    'playlist_items': num
+                    }
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([playlist_url])
+
 def convertMusicFile(index, inputsize=1000):
-    filename = 'musicDataSet/' + str(index) + '.wav'
+    filename = 'musicDataSet/' + "{0:0=3d}".format(index) + '.wav'
     samplerate, data = wavUtil.read(filename)
 
     #Get rid of quiet parts in the beginning and end
@@ -25,7 +39,7 @@ def convertMusicFile(index, inputsize=1000):
         index1 += 1
     while data[index2][0] == 0 and data[index2][1] == 0:
         index2 -= 1
-    data = data[index1:(index2 + 1)]
+    data = data[index1:(index2)]
 
     return data
 
@@ -379,7 +393,7 @@ def get_data(index):
     return scale, data
 
 def trainLSTM():
-    lstm = LSTM(1024, 1024, out_type='linear',
+    lstm = GRU(*(3 * (1024,)), nonlinearity=lambda x:x,
             init_size=0.001, verbose=True)
     y_ = T.matrix()
     error = T.mean(T.sum(T.sqr(lstm.out - y_), axis=1))
@@ -397,7 +411,11 @@ def trainLSTM():
     model_name = 'gaussbiglstm'
     def save():
         saveParams(lstm.params, model_name)
+        generate(name=str(save.filename)+'test.wav')
+        save.filename += 1
         return
+
+    save.filename = 0
 
     def load():
         loadParams(lstm.params, model_name + '.npz')
@@ -406,20 +424,30 @@ def trainLSTM():
     def generate(lame=True, name='test.wav'):
         if lame:
             song = predict(X_dat[:1000])
-            generateMusicFile(FT_to_wav(scaleBack(song, scale)), name)
+            generateMusicFile(FT_to_wav(scaleBack(song, scale, type='gauss'))
+                    , name)
         else:
             song = np.zeros((10000, 1024)).astype('float32')
             song[:1] = X_dat[:1]
             for i in range(1, 10000):
                 song[i:i+1] = predict(song[i-1:i])
                 print("\r{} of the way there".format(i/10000), end="")
-            generateMusicFile(FT_to_wav(scaleBack(song, scale)), name)
+            generateMusicFile(FT_to_wav(scaleBack(song, scale, type='gauss')), name)
             print("")
         return
 
+    try:
+        load()
+    except:
+        print("Failed to load previous model")
+    print("Saving")
+    save()
+
+    print("Compiling learn function")
     learn = theano.function([lstm.x, y_], error, updates=upd,
             allow_input_downcast=True)
-    train_error = miniRecurrentLearning(X_dat, Y_dat, 20, learn, predict, reset,
+    print("Commencing learning")
+    train_error = miniRecurrentLearning(X_dat, Y_dat, 200, learn, predict, reset,
             verbose=True, epochs=10, save=save, saveiters=300, strides=5)
 
     pickle.dump(train_error, open('lstm_train.data', 'wb'))
