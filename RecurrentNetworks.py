@@ -227,6 +227,47 @@ class GRULayer:
         shape = self.hidden.get_value().shape
         self.hidden.set_value(np.zeros(shape).astype(theano.config.floatX))
 
+class GRU:
+    def __init__(self, *dim, **kwargs):
+        self.x = kwargs.get('in_var', T.matrix())
+        h_nonlinearity = kwargs.get('h_nonlinearity', T.tanh)
+        nonlinearity = kwargs.get('nonlinearity', T.nnet.sigmoid)
+        init_size = kwargs.get('init_size', -1)
+        verbose = kwargs.get('verbose', False)
+
+        layers = []
+        nl = h_nonlinearity
+        if len(dim) <= 2:
+            nl = nonlinearity
+        l = GRULayer(dim[0], dim[1], in_var=self.x, nonlinearity=nl,
+                init_size=init_size)
+        layers.append(l)
+
+        for i in range(1, len(dim)-1):
+            if i == len(dim) - 2:
+                nl = nonlinearity
+            l = GRULayer(dim[i], dim[i+1], in_var=layers[-1].out,
+                    nonlinearity=nl, init_size=init_size)
+            layers.append(l)
+
+        self.params = []
+        self.updates = []
+        for l in layers:
+            self.params += l.params
+            self.updates += l.updates
+
+        self.out = layers[-1].out
+        self.predict = theano.function([self.x], self.out, updates=self.updates,
+                allow_input_downcast=True)
+        print("Done constructing gru")
+        return
+
+    def reset(self):
+        for l in layers:
+            l.reset()
+        return
+
+
 class LSTMLayer:
     '''
         This assumes that in this recurrent net, there is a corresponding output to each input
