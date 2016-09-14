@@ -43,8 +43,8 @@ def convertMusicFile(index, inputsize=1000):
 
     return data
 
-def generateMusicFile(arr, f):
-    data = arr.reshape(arr.size//2, 2).astype('int16')
+def generateMusicFile(arr, f, channels=2):
+    data = arr.reshape(arr.size//channels, channels).astype('int16')
     wavUtil.write(f, 44100, data)
 
 def testPrediction(predict):
@@ -93,7 +93,7 @@ def FT_to_wav(data, channels=2):
             data     - 2d array output of wav_to_FT()
             channels - number of channels that the original sound file had
     """
-    output = np.zeros((data.size / (2 * channels), channels))
+    output = np.zeros((data.size // (2 * channels), channels))
 
     time = 0
 
@@ -103,8 +103,8 @@ def FT_to_wav(data, channels=2):
 
         curchannel = 0
         for c in range(0, data.shape[1], time_length):
-            ft = row[c:(c+time_length/2)] + 1j * \
-                row[(c+time_length/2):(c+time_length)]
+            ft = row[c:(c+time_length//2)] + 1j * \
+                row[(c+time_length//2):(c+time_length)]
             org = np.fft.ifft(ft)
             output[time:(time+chunk_time_size),curchannel] = org
             curchannel += 1
@@ -384,34 +384,41 @@ def testKerasLSTM():
         model.fit(X_ex, Y_ex)
         model.save_weights("keras_musicgen.h5", overwrite=True)
 
-def get_data(index):
+def get_data(index, channels='reg', chunk_size=1024):
     od = convertMusicFile(index)
     od = od.astype('float32')
 
-    data = wav_to_FT(od)
+    if channels == 'mono':
+        od = od[:,:-1]
+    data = wav_to_FT(od, chunk_size=chunk_size)
     scale, data = normalize(data, type='gauss')
     return scale, data
 
 def trainLSTM():
-    lstm = GRU(*(3 * (1024,)), nonlinearity=lambda x:x,
+    CHANNELS = 1
+    INPUT_SIZE = 2048
+    lstm = GRU(*(4 * (INPUT_SIZE,)), nonlinearity=lambda x:x,
             init_size=0.001, verbose=True)
     y_ = T.matrix()
     error = T.mean(T.sum(T.sqr(lstm.out - y_), axis=1))
-    (storage, upd) = generateRmsProp(lstm.params, error, alpha=1e-5, verbose=True)
+    (storage, upd) = generateRmsProp(lstm.params, error, alpha=1e-4, verbose=True)
 
     predict = lstm.predict
     reset = lstm.reset
 
 
     print("Loading data")
-    scale, data = get_data(0)
+    scale, data = get_data(1, 'mono', chunk_size=INPUT_SIZE)
     X_dat = data[:-1]
     Y_dat = data[1:]
+
+    error_file = open('gausslstmerror.txt', 'a')
 
     model_name = 'gaussbiglstm'
     def save():
         saveParams(lstm.params, model_name)
-        generate(name=str(save.filename)+'test.wav')
+        generate(name=str(save.filename)+'test_boring.wav')
+        generate(name=str(save.filename)+'test_interesting.wav', lame=False)
         save.filename += 1
         return
 
@@ -424,15 +431,17 @@ def trainLSTM():
     def generate(lame=True, name='test.wav'):
         if lame:
             song = predict(X_dat[:1000])
-            generateMusicFile(FT_to_wav(scaleBack(song, scale, type='gauss'))
-                    , name)
+            generateMusicFile(FT_to_wav(scaleBack(song, scale, type='gauss'),
+                channels=CHANNELS) , name, channels=1)
         else:
-            song = np.zeros((10000, 1024)).astype('float32')
+            length = 2500
+            song = np.zeros((length, INPUT_SIZE)).astype('float32')
             song[:1] = X_dat[:1]
-            for i in range(1, 10000):
+            for i in range(1, length):
                 song[i:i+1] = predict(song[i-1:i])
-                print("\r{} of the way there".format(i/10000), end="")
-            generateMusicFile(FT_to_wav(scaleBack(song, scale, type='gauss')), name)
+                print("\r{} of the way there".format(i/length), end="")
+            generateMusicFile(FT_to_wav(scaleBack(song, scale, type='gauss'),
+                channels=CHANNELS), name, channels=CHANNELS)
             print("")
         return
 
@@ -448,7 +457,8 @@ def trainLSTM():
             allow_input_downcast=True)
     print("Commencing learning")
     train_error = miniRecurrentLearning(X_dat, Y_dat, 200, learn, predict, reset,
-            verbose=True, epochs=10, save=save, saveiters=300, strides=5)
+            verbose=True, epochs=10, save=save, saveiters=300, strides=1,
+            f=error_file)
 
     pickle.dump(train_error, open('lstm_train.data', 'wb'))
 

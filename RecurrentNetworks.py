@@ -259,14 +259,14 @@ class GRU:
         self.out = layers[-1].out
         self.predict = theano.function([self.x], self.out, updates=self.updates,
                 allow_input_downcast=True)
+        self.layers = layers
         print("Done constructing gru")
         return
 
     def reset(self):
-        for l in layers:
+        for l in self.layers:
             l.reset()
         return
-
 
 class LSTMLayer:
     '''
@@ -501,7 +501,7 @@ class LSTM():
 
 
 def miniRecurrentLearning(x, y, batchSize, learn, predict, reset, verbose=False,
-        epochs=1, miniepochs=1, save=None, saveiters=None, strides=1):
+        epochs=1, miniepochs=1, save=None, saveiters=None, strides=1, f=None):
     """
     Train model on parts of a time series at a time
     e.g. given time seires : 1, 2, 3, 4, 5, 6
@@ -541,6 +541,9 @@ def miniRecurrentLearning(x, y, batchSize, learn, predict, reset, verbose=False,
             if save and saveiters:
                 if iterations % saveiters == 0:
                     save()
+            if not f is None:
+                f.write(str(train_error[-1]) + '\n')
+                f.flush()
             predict(x[batch:batch+strides])
         reset()
     return train_error

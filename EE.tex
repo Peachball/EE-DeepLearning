@@ -123,7 +123,7 @@ takes more time than a traditional recurrent neural network.
 However, the accuracy of the LSTM can be improved if it is allowed to reset
 it's memory state. As originally suggested by Gers, if a LSTM's memory is
 multiplied by a ``forget gate'', which is a value between 0 and 1, the LSTM can
-predict even longer sequences~\cite{forget}. Through forget gates, the memory of
+predict even longer sequences~\cite{forgetgate}. Through forget gates, the memory of
 LSTM's are restrained from growing too large, which would cause the memory cells
 to be useless. Also, this addition of a forget gate intuitively, as useless
 memory should be discarded. The LSTM's in this paper will be assumed to have
@@ -299,13 +299,19 @@ learn long term patterns within the data, due to the gradient not being
 calculated with respect to all data samples.
 
 
-%\subsection{Real Time Recurrent Learning}
-%Although back propagation through time is simple to implement, it is
-%expensive to calculate, as it requires a complete sequence of data. However,
-%another derivation of the derivative of the cost function gives real time
-%recurrent learning, which is only dependent on some stored variables, and one
-%data sample. However, implementation of this algorithm requires manual
-%differention of 
+\subsection{Real Time Recurrent Learning}
+Although back propagation through time is simple to implement, it is expensive
+to calculate, as it requires a complete sequence of data. However, another
+derivation of the derivative of the cost function gives real time recurrent
+learning, which is only dependent on some stored variables, and one data sample.
+However, this algorithm requires storage of all of the gradients of each weight
+to each hidden unit. As a result, as large recurrent networks easily have large
+numbers of hidden units and weights, this algorithm increases the computational
+requirements of the recurrent network drastically. Furthermore, each learning
+step takes the order of O((hidden units)$^4$), according to Jaeger's calculatoins,
+resulting in very slow gradient updates for recurrent networks of moderate or
+larger size~\cite{rnntrain}. Thus, this method will not be utilized either.
+
 
 \subsection{Implementational Details}
 Python and Theano are used to test these models. Theano is considered to be very
@@ -414,6 +420,12 @@ check https://github.com/Peachball/EE-DeepLearning.
 	\bibitem{lstmbias}
 		Jozefowicz, Zaremba, and Sutskever. ``An Empirical Exploration of Neural
 		Network Architectures.'' \textit{JMLR}, vol 37. Web. 4 Sept. 2016.
+
+	\bibitem{rnntrain}
+		Jaeger, Herbert. ``A Tutorial on training recurrent neural networks,
+		covering BPTT, RTRL, EKF, and the ``echo state network''
+		approach.'' \textit{German National Research Center for Information
+		Technology}, 2013. Web. 10 Sept. 2016.
 \end{thebibliography}
 
 \end{document}
