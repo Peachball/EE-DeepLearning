@@ -42,22 +42,38 @@ This is known as gradient descent.
 
 \subsection{Logistic Regression Model}
 To understand learning algorithms, the logistic regression model is notable, as
-it is the fundamental building block for larger models. This model predicts a
-class based on an input vector of data. Given that: 
-$$ \textrm{The input vector} = x$$
-and that any value represented by W is a weight matrix that the model learns,
-the logistic regression model can be represented as:
-$$ \textrm{output} = \sigma(x\cdot W) $$
-where:
-$$\sigma(x) = \frac{1}{1 + e^{-x}} $$
-However, this model typically also includes a bias term, to improve performance,
-changing the equation to:
-$$ \textrm{output} = \sigma(x\cdot W + b) $$
+it is the fundamental building block for larger models. Logistic regression
+models are classification modles.
+%This model predicts a
+%class based on an input vector of data. Given that: 
+%$$ \textrm{The input vector} = x$$
+%and that any value represented by W is a weight matrix that the model learns,
+%the logistic regression model can be represented as:
+%$$ \textrm{output} = \sigma(x\cdot W) $$
+%where:
+%$$\sigma(x) = \frac{1}{1 + e^{-x}} $$
+%However, this model typically also includes a bias term, to improve performance,
+%changing the equation to:
+%$$ \textrm{output} = \sigma(x\cdot W + b) $$
 
-Logistic regression models typically are used to predict the probability of a
+This means that they are typically used to predict the probability of a
 situation or event, based on data. For example, it could be used to predict how
 likely someone is to develop cancer based on the data relating to the medical
 history of the patient.
+
+They do this through first converting the existing data, such as medical
+records, into a vector of numbers. Then, the model multiplies a weight value to
+each input number, and sums up the products of weight value with input numbers.
+The weight can be thought of as the significance of each input, and the sign
+being whether or not the input value is positively or negatively correlated to
+the data. After summing the product of weight values with input values, the sum
+is passed into the logistic function, which changes the sum into a value between
+0 and 1. This new value, between 0 and 1 is the probability of an event
+happening, and is compared against the correct value, being whether or not the
+event, such as cancer, did or did not happen based on the data.
+
+These models, however, are generally too simplistic to model complicated
+scenarios in the world.
 
 \subsection{Neural Networks}
 To understand the other models, one must first understand what a neural network
@@ -206,6 +222,10 @@ as elements in an image are generally more related to each other if they are
 closer to each other. However, convolutional networks can also be used in time
 series analysis, as demonstrated by the research done by
 Abdel-Hamid~\cite{convrnn}.
+
+Furthermore, the startup company bought by Google, known as Deep Mind,
+successfully utilized the idea of convolutional networks to model music and
+speech, which demonstrates the potential power of convolutional nets.
 
 
 \subsection{Autoencoder}

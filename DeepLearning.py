@@ -146,6 +146,17 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True,
             return theano.shared(np.random.uniform(low=-s, high=s,
                 size=shape).astype(theano.config.floatX), name=name)
 
+def generateHessian(params, error, alpha=1, verbose=False):
+    if verbose:
+        print("Calculating Updates")
+
+    updates = []
+
+    for p in params:
+        grad = T.grad(error, p)
+        hes = T.grad(error, grad)
+        updates.append((p, p - alpha * (grad / hes)))
+    return updates
 
 def generateAdagrad(params, error, alpha=0.01, epsilon=1e-8, verbose=False,
         clip=None):
@@ -642,6 +653,26 @@ def saveParams(params, f):
     np.savez(f, *arr)
     print("Done!")
 
+def saveH5(param_map, filename):
+    import h5py
+    print("Saving params")
+    f = h5py.File(filename, 'w')
+    for k, v in param_map.items():
+        f.create_dataset(k, data=v.get_value())
+
+    f.close()
+    print("Done")
+    return
+
+def loadH5(param_map, filename):
+    import h5py
+    print("Loading params")
+    f = h5py.File(filename, 'r')
+    for k, v in param_map.items():
+        param_map[k].set_value(f[k][:])
+    print("Done")
+    return
+
 def loadParams(params, f):
     def load_npz(npz):
         j = {}
@@ -699,7 +730,7 @@ def AETester():
     y = T.matrix('correct output')
     yl = T.matrix('Correct labels')
     regError = getRegularization(ae.params)
-    mse = T.sqrt(T.mean(T.sqr(y - ae.reconstructed)))
+    mse = T.mean(T.sqr(y - ae.reconstructed))
     normErr = mse
 
     crossEntrop = -T.mean(y * T.log(ae.reconstructed) +
@@ -782,6 +813,19 @@ def NNTester():
     plt.ylabel("MSE")
     figure.suptitle("Learning Style Comparison")
     plt.savefig("test.png")
+    plt.show()
+
+def HessianTester():
+    images, labels = readMNISTData(6000)
+    model = FFClassifier(784, 300, 10)
+    y = T.matrix('labels')
+    error = - T.mean(y * T.log(model.out) + (1-y) * T.log(1 - model.out))
+    _, updates = generateAdagrad(model.params, error, alpha=0.001)
+
+    learn = theano.function([model.x, y], error, updates=updates,
+            allow_input_downcast=True)
+    err = miniBatchLearning(images, labels, 1, learn, verbose=True, epochs=5)
+    plt.plot(err)
     plt.show()
 
 def normalize(x, dim=0, low=-1, high=1, scaleFactor=None, type='range'):
@@ -957,4 +1001,4 @@ def KerasConvolutionDreamerTest():
 
 
 if __name__ == '__main__':
-    KerasConvolutionDreamerTest()
+    HessianTester()
