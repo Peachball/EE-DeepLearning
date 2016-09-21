@@ -8,6 +8,9 @@ from DeepLearning import readMNISTData, readcv, miniBatchLearning, init_weights
 from DeepLearning import saveParams, loadParams
 from DCGAN import load_images
 
+def sample(x, rng):
+    return rng.binomial(size=x.shape, n=1, p=x, dtype=theano.config.floatX)
+
 class RBMLayer:
     def __init__(self, in_size, hidden_size, visible_type='det', hidden_type='det',
             distribution=T.nnet.sigmoid, init_size=0.1, in_var=T.matrix('input'),
@@ -38,15 +41,10 @@ class RBMLayer:
         self.out = distribution(T.dot(hidden, self.w.T) + self.b)
         self._getSample = theano.function([in_var], self.out)
 
-        self.persistentCD = theano.shared(
-                value=np.random.uniform(low=-init_size, high=init_size,
-                    size=(persistent_updatesize, in_size))
-                .astype(theano.config.floatX),
-                name='Persistent CD')
-
         self.params = [self.b, self.c, self.w]
 
     def getHidden(self, v):
+        v = T.round(v)
         h = T.dot(v, self.w) + self.c
         h_sigmoid = T.nnet.sigmoid(h)
         h_bin = self.theano_rng.binomial(size=h.shape, n=1, p=h_sigmoid,
@@ -54,6 +52,7 @@ class RBMLayer:
         return [h, h_sigmoid, h_bin]
 
     def getVisible(self, h):
+        h = T.round(h)
         v = T.dot(h, self.w.T) + self.b
         v_sigmoid = T.nnet.sigmoid(v)
         v_bin = self.theano_rng.binomial(size=v.shape, n=1, p=v_sigmoid,
@@ -105,34 +104,12 @@ class RBMLayer:
 
         #Calculate gradient
         gparams = T.grad(cost, self.params, consider_constant=[chain_end])
-        gradUpdates = []
-        gradUpdates.append((persistent, chain_end))
+        updates[persistent] = chain_end
 
         for g, p in zip(gparams, self.params):
-            gradUpdates.append((p, p - lr * g))
+            updates[p] = p - lr * g
 
-        return cost, gradUpdates
-
-
-    def CDUpdates(self, x, alpha):
-        negativeSample = self.persistentCD
-        updates = []
-
-        #Weight updates
-        hidden = self.distribution(T.dot(x, self.w) + self.c)
-        negHidden = self.distribution(T.dot(negativeSample, self.w) + self.c)
-        weightGrad = (T.dot(x.T, hidden))/x.shape[0] - T.dot(negativeSample.T, negHidden)/negHidden.shape[0]
-        updates.append((self.w, self.w + alpha * (weightGrad)))
-
-        #Bias updates
-        updates.append((self.b, self.b + T.mean(alpha * (x - negativeSample), axis=0)))
-        updates.append((self.c, (self.c + T.mean(alpha * (hidden - negHidden), axis=0))))
-
-        #Persistent Contrastive Divergence
-        newCD_h = self.distribution(T.dot(self.persistentCD, self.w) + self.c)
-        newCD_v = self.distribution(T.dot(newCD_h, self.w.T) + self.b)
-        updates.append((self.persistentCD, newCD_v))
-        return updates
+        return cost, updates
 
     def gibbSample(self, startSample, k=1):
         sample = startSample
@@ -140,21 +117,6 @@ class RBMLayer:
             sample = self._getSample(sample)
         return sample
 
-    def miniBatch(self, learnFunction, x, epochs=1, verbose=False):
-        train_error = []
-        batchSize = self.persistentCD.get_value().shape[0]
-
-        for i in range(epochs):
-            for j in range(0, x.shape[0] - batchSize + 1, batchSize):
-                learnx = x[j:(j+batchSize)]
-                error = learnFunction(learnx, learnx)
-                if verbose: print(error, "Epoch:", i + j/x.shape[0])
-                train_error.append(error)
-        return train_error
-
-class RNNRBMLayer:
-    def __init__(self, in_size, v_size, hidden_size):
-        pass
 
 class ConvRBMLayer:
     def __init__(self, in_dim, out_filters, filt_size,
@@ -168,14 +130,13 @@ class ConvRBMLayer:
 
         self.params = [self.w, self.b, self.c]
 
-    #Only supports one variable
     def free_energy(self, v):
-        visible_energy = -T.sum(v * self.c.dimshuffle('x', 0, 'x', 'x'),
+        visible_energy = -T.mean(v * self.c.dimshuffle('x', 0, 'x', 'x'),
                 axis=(1, 2, 3))
         conv = T.nnet.conv.conv2d(v, self.w)
         hidden_energy = -T.nnet.softplus(conv +
                                     self.b.dimshuffle('x', 0, 'x',
-                                        'x')).sum(axis=(1,2,3))
+                                        'x')).mean(axis=(1,2,3))
 
         return visible_energy + hidden_energy
 
@@ -225,43 +186,54 @@ class ConvRBMLayer:
         [v_act, v_sig, v_bin] = self.getVisible(h_bin)
         return v_sig, v_bin
 
-    def getCDUpdates(self, v, persistent, steps=1, pooling=None):
-        visible_energy = self.free_energy(v)
+    def mean_vhv(self, v, pool=None):
+        v_tm1bin = self.theano_rng.binomial(size=v.shape, n=1, p=v,
+                dtype=theano.config.floatX)
+        [h_act, h_sig, h_bin] = self.getHidden(v_tm1bin)
+        [v_act, v_sig, v_bin] = self.getVisible(h_bin)
+        return v_sig
+
+    def getCDUpdates(self, v, persistent, steps=1, pooling=None, sparsity=False):
+        v_bin = self.theano_rng.binomial(size=v.shape, n=1, p=v,
+                dtype=theano.config.floatX)
+        visible_energy = self.free_energy(v_bin)
 
         def gibbsSample(prev_sample):
             v_sig, v_bin = self.sample_vhv(prev_sample)
             return v_bin, v_sig
 
         [samples, _], updates = theano.scan(fn=gibbsSample,
-                outputs_info=persistent, n_steps=steps)
+                outputs_info=[persistent, None], n_steps=steps)
 
         new_chain = samples[-1]
         upd = list(updates.items()) + [(persistent, new_chain)]
         energy = T.mean(self.free_energy(v)) -\
                 T.mean(self.free_energy(new_chain))
 
+        if not sparsity is None and not sparsity == False:
+            energy = energy + sparsity * T.mean(T.sqr(self.w))
+
         grad = T.grad(energy, self.params, consider_constant=[new_chain])
         return upd, energy, grad
 
 def RBMTester():
-    theano.config.floatX='float32'
-    images, labels = readMNISTData(1000)
+    images, labels = readMNISTData(10000)
 
     images = images.astype(theano.config.floatX)
 
     images = images / images.max()
 
-    x = T.matrix()
+    x = T.matrix('input')
     y = T.matrix()
 
-    rbm = RBMLayer(784, 600, in_var=x)
+    rbm = RBMLayer(784, 500, in_var=x)
 
-    mse = T.mean(T.sqr(rbm.sample_vhv(x) - y))
+    mse = T.mean(T.sqr(rbm.mean_vhv(x) - y))
 
 
     persistent = theano.shared(np.zeros((20,
         784)).astype(theano.config.floatX))
-    _, updates = rbm.cost_updates(lr=0.001, persistent=persistent)
+    _, updates = rbm.cost_updates(lr=0.001, persistent=persistent, k=15)
 
 
     learn = theano.function([rbm.x, y], mse, updates=updates,
@@ -271,31 +243,36 @@ def RBMTester():
             allow_input_downcast=True)
 
     sampled = np.zeros((1, 784)).astype('float32')
-    miniBatchLearning(images, images, 100, learn, verbose=True, epochs=30)
+    miniBatchLearning(images, images, 20, learn, verbose=True, epochs=1)
 
     for i in range(100):
         sampled = generate(sampled)
-        miniBatchLearning(images, images, 1000, learn, verbose=True, epochs=1)
+        miniBatchLearning(images, images, 20, learn, verbose=True, epochs=1)
         plt.imshow(sampled[0].reshape(28, 28), cmap='Greys', interpolation='none')
         plt.show()
 
 def ConvRBMTester():
+    from keras.datasets import cifar10
+    (X_train, _), _ = cifar10.load_data()
+    X_train = X_train.astype('float32') / 255
     X = T.tensor4()
     x_mnist, _ = readMNISTData(10000)
     x_mnist = x_mnist.reshape(-1, 1, 28, 28) / 255
     print(x_mnist.shape)
-    rbm = ConvRBMLayer(1, 4, (3, 3))
+    rbm = ConvRBMLayer(3, 24, (9, 9))
     _, _, hid_bin = rbm.getHidden(X)
     energy = rbm.free_energy(X)
-    persistent = theano.shared(np.zeros((100, 1, 28, 28)).astype(theano.config.floatX))
-    upd, error, grad = rbm.getCDUpdates(X, persistent)
+    persistent = theano.shared(np.random.rand(2, 3, 32, 32).astype(theano.config.floatX))
+    upd, error, grad = rbm.getCDUpdates(X, persistent, steps=2, sparsity=False)
 
-    upd += [(p, p - 0.001 * g) for p, g in zip(rbm.params, grad)]
+    origupd = upd
+    upd += [(p, p - 0.3 * g) for p, g in zip(rbm.params, grad)]
 
     learn = theano.function([X], error, updates=upd, allow_input_downcast=True)
-    generate = theano.function([X], rbm.sample_vhv(X)[0],
-            allow_input_downcast=True, mode='DebugMode')
+    generate = theano.function([X], rbm.mean_vhv(X),
+            allow_input_downcast=True)
 
+    gradient = theano.function([X], [error, T.mean(T.abs_(grad[0]))], updates=origupd, allow_input_downcast=True)
     # try:
         # loadParams(rbm.params, 'convrbm.npz')
     # except:
@@ -304,14 +281,65 @@ def ConvRBMTester():
     iteration = 0
     batchSize = 10
     counter = 0
+    saveParams(rbm.params, 'convrbm.npz')
+    plt.ion()
     for i in range(10000):
-        index = min(i * 100 % 10000, 9900)
-        print(learn(x_mnist[index:index+100]))
-        if i % 1000 == 0:
-            plt.imshow(persistent.get_value()[0,0], cmap='Greys')
-            plt.show()
+        index = 0#i * 20 % 10000
+        print(learn(X_train[index:index+2]))
+        # print(gradient(X_train[index:index+20]))
+        # print(np.mean(np.abs(rbm.w.get_value())))
+        counter += 1
+        img = generate(persistent.get_value())
+        plt.subplot(2, 2, 1)
+        plt.imshow(img[0].transpose(1, 2, 0) * 255)
+        plt.subplot(2, 2, 2)
+        gen_i = generate(X_train[index:index+1])
+        plt.imshow(gen_i[0].transpose(1, 2, 0) * 255)
+        plt.subplot(2, 2, 3)
+        plt.imshow(X_train[index].transpose(1, 2, 0) * 255)
+        plt.subplot(2, 2, 4)
+        plt.imshow(X_train[index + 1].transpose(1, 2, 0) * 255)
+        plt.pause(0.05)
+        if counter % 50 == 0:
+            saveParams(rbm.params, 'convrbm.npz')
 
-    print('lol i"m dumb')
+def basic_ConvRBMTester():
+    X = T.tensor4()
+    rbm = ConvRBMLayer(1, 24, (15, 15))
+    persistent = theano.shared(np.random.rand(9, 1, 30,
+        30).astype(theano.config.floatX))
+    upd, energy, grad = rbm.getCDUpdates(X, persistent, steps=1)
+
+    gradUpdates = [(p, p - 0.1 * g) for p, g in zip(rbm.params, grad)]
+    updates = upd + gradUpdates
+
+    x_mnist, _ = readMNISTData(10)
+    x_mnist = x_mnist.reshape(-1, 1, 28, 28).astype('float32') / 255
+    img = np.ones((1, 1, 30, 30)).astype(theano.config.floatX)
+    img[0,0,0,0] = 0
+    learn = theano.function([X], energy, updates=updates,
+            allow_input_downcast=True)
+    generate = theano.function([X], rbm.mean_vhv(X), allow_input_downcast=True)
+
+    plt.ion()
+    for i in range(10000):
+        print(learn(x_mnist[0:1]))
+        if i % 100 == 0:
+            plt.figure(1)
+            for i in range(9):
+                plt.subplot(3, 3, i+1)
+                plt.imshow(persistent.get_value()[i, 0] * 255, cmap='Greys')
+            plt.figure(2)
+            plt.imshow(generate(x_mnist[0:1])[0,0] * 255, cmap='Greys')
+            plt.pause(0.05)
+
+
+    for i in range(16):
+        plt.subplot(4, 4, i+1)
+        plt.imshow(persistent.get_value()[i, 0] * 255, cmap='Greys')
+    plt.figure()
+    plt.imshow(x_mnist[1, 0] * 255, cmap='Greys')
+    plt.show()
 
 if __name__== '__main__':
-    RBMTester()
+    ConvRBMTester()
