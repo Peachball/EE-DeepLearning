@@ -8,6 +8,7 @@
 \usepackage[T1]{fontenc}
 \usepackage[american]{babel}
 \usepackage{csquotes}
+\usepackage{hyperref}
 
 \geometry{margin=1in}
 \graphicspath{{EEimages/}}
@@ -30,15 +31,16 @@ to see the relative abilities of each model to remember sequences, or compress
 the music.
 
 \section{Models}
-The models that will be used are recurrent neural networks, and other methods
-such as restricted boltzmann machines and autoencoders to reduce the
-dimensionality of the data before feeding the data into the neural network.
+The models that will be tested and evaluated will be different variations of
+state of the art recurrent neural networks, and their effectiveness will be
+judged by the time they take to minimize the mean squared error of the music
+file that they are trying to model.
 
-However, in general, all the listed models, have some cost function that they
-are trying to minimize. Typically, and in this paper, the cost function is
-assumed to be minimized through calculating the gradient of the cost function
-with respect to the weights, and then subtracting the gradient from the weights.
-This is known as gradient descent.
+Although the models may have differnt structures, in general all the listed
+models, have some cost function that they are trying to minimize. Typically, and
+in this paper, the cost function is assumed to be minimized through calculating
+the gradient of the cost function with respect to the weights, and then
+subtracting the gradient from the weights.  This is known as gradient descent.
 
 \subsection{Logistic Regression Model}
 To understand learning algorithms, the logistic regression model is notable, as
@@ -350,14 +352,33 @@ along with different dimensionality reducing steps. The different dimensionality
 reducing techniques that will also be tested will be autoencoders, restricted
 Boltzmann machines, and convolutional layers.
 
-However, the structure of the models will also be tested. According to the
-Google Research Blog, having different overlapping models can help improve
-accuracy, so a similar idea will be tested in this paper~\cite{widendeep}.
-\section{Data}
+\begin{table}[H]
+	\begin{tabular}{c|c}
+		Model type: & Time model took to train 3 epochs \\\hline
+		1 Layer GRU& \\
+		2 Layer GRU& \\
+		3 Layer GRU& \\
+		1 Layer Clockwork RNN& \\
+		2 Layer Clockwork RNN& \\
+		3 Layer Clockwork RNN& \\
+		1 Layer LSTM& \\
+		2 Layer LSTM& \\
+		3 Layer LSTM& \\
+	\end{tabular}
+	\caption{Time each tested model took to converge to error}
+\end{table}
+
+The restricted boltzmann machine and autoencoder did not decrease their
+reconstruction error to a significant amount, and did not even overfit the
+data when they had enough hidden units, which suggests that they were
+implemented poorly or that they take a significant amount of time to train.
+Thus, due to limitations in resources, they do not have benchmarks, while the
+other models do.
+
 
 \section{Appendix}
 As the code is extremely lengthy, it is stored separately. To view the code,
-check https://github.com/Peachball/EE-DeepLearning.
+refer to \href{https://github.com/Peachball/EE-DeepLearning}.
 
 
 \begin{thebibliography}{9}
