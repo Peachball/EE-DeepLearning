@@ -36,11 +36,11 @@ state of the art recurrent neural networks, and their effectiveness will be
 judged by the time they take to minimize the mean squared error of the music
 file that they are trying to model.
 
-Although the models may have differnt structures, in general all the listed
+Although the models may have different structures, in general all the listed
 models, have some cost function that they are trying to minimize. Typically, and
 in this paper, the cost function is assumed to be minimized through calculating
 the gradient of the cost function with respect to the weights, and then
-subtracting the gradient from the weights.  This is known as gradient descent.
+subtracting the gradient from the weights. This is known as gradient descent.
 
 \subsection{Logistic Regression Model}
 To understand learning algorithms, the logistic regression model is notable, as
@@ -335,22 +335,49 @@ resulting in very slow gradient updates for recurrent networks of moderate or
 larger size~\cite{rnntrain}. Thus, this method will not be utilized either.
 
 
-\subsection{Implementational Details}
-Python and Theano are used to test these models. Theano is considered to be very
-fast amongst the machine learning community, which is why it is used. Also, a
-gpu will be utilized to increase the performance of all models. The music
-utilized for the model will have come from Youtube. Furthermore, to aid the
-model, the music will be put through a Fourier transform before having the model
-learn it. This is purely to produce nicer results, as when testing without the
-Fourier transform, the model took longer to train and produced more static,
-as opposed to the model trained on the Fourier transform.
-
 \section{Comparison}
 Thus, this paper will compare the effectiveness of the various models, being
 LSTMs, Vanilla Recurrent Networks, and Clockwork Recurrent Neural Networks,
 along with different dimensionality reducing steps. The different dimensionality
 reducing techniques that will also be tested will be autoencoders, restricted
 Boltzmann machines, and convolutional layers.
+
+\section{Implementational Details}
+Python and Theano are used to test these models. Theano is considered to be very
+fast amongst the machine learning community, which is why it is used. Also, a
+gpu will be utilized to increase the performance of all models. The music
+utilized for the model will have come from Youtube. Also, as it was found that
+generally electronic music yielded better results, electronic Youtube music is
+used for aesthetic purposes, and to get better errors to compare. Furthermore,
+to aid the model, the music will be put through a Fourier transform before
+having the model learn it. This is purely to produce nicer results, as when
+testing without the Fourier transform, the model took longer to train and
+produced more static, as opposed to the model trained on the Fourier transform.
+
+The comparisons will be done with networks all having cell sizes, or memory
+sizes, or 2048, and with input sizes of 2048. This is because it was observed
+that with larger input sizes, the network learned the music better. Also, the
+cell sizes of each of the respective networks were kept constant, as I thought
+the cell sizes would directly impact the effectiveness of the network, and since
+I wanted to compare the network structure, and not the effect of cell size, I
+kept the cell sizes of all the networks constant.
+
+However, this does not necessarily alleviate the problem as some networks may
+just naturally use their memory cells more effectively than others, because of
+more weight matrices. However, I did not have enough resources to test the
+relationship between the number of weights and modeling capability of the
+network.
+
+Also, as mentioned in the section about training these networks, back
+propagation through time is used because it is the simplest and least
+computationally expensive algorithm available. The networks were trained for 5
+epochs on the data, with a sequence of length 200 samples of size 2048 being fed
+into the network each time. The data was iterated over by 5 samples at a time.
+
+The networks were then trained on the data with a GTX 960M, to speed up
+training. Also the reason why only 5 epochs were used was also to save time, as
+a large variation of models were being tested.
+
 
 \begin{table}[H]
 	\begin{tabular}{c|c}
@@ -365,8 +392,9 @@ Boltzmann machines, and convolutional layers.
 		2 Layer LSTM& \\
 		3 Layer LSTM& \\
 	\end{tabular}
-	\caption{Time each tested model took to converge to error}
+	\caption{Time each tested model took to run 5 epochs}
 \end{table}
+
 
 The restricted boltzmann machine and autoencoder did not decrease their
 reconstruction error to a significant amount, and did not even overfit the
@@ -374,6 +402,8 @@ data when they had enough hidden units, which suggests that they were
 implemented poorly or that they take a significant amount of time to train.
 Thus, due to limitations in resources, they do not have benchmarks, while the
 other models do.
+
+\section{Observations}
 
 
 \section{Appendix}
@@ -467,6 +497,9 @@ refer to \href{https://github.com/Peachball/EE-DeepLearning}.
 		covering BPTT, RTRL, EKF, and the ``echo state network''
 		approach.'' \textit{German National Research Center for Information
 		Technology}, 2013. Web. 10 Sept. 2016.
+
+	\bibitem{graddescent}
+		%http://sebastianruder.com/optimizing-gradient-descent/index.html#gradientdescentvariants
 \end{thebibliography}
 
 \end{document}
