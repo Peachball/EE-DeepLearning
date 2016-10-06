@@ -5,6 +5,7 @@ from DeepLearning import *
 import matplotlib.pyplot as plt
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Reshape, BatchNormalization
+from keras.layers import Flatten
 from keras.layers.convolutional import Convolution2D, UpSampling2D, MaxPooling2D
 from keras.optimizers import SGD
 
@@ -210,8 +211,26 @@ def hehexd():
         if iteration % 100 == 0:
             saveH5(all_param_map, savefile)
 
-def keras_generator():
-    pass
+def keras_DCGAN():
+    discriminator = Sequential()
+    discriminator.add(Convolution2D(32, 3, 3, border_mode='same',
+        input_shape=(3, 1024, 1024)))
+    discriminator.add(MaxPooling2D((2, 2), border_mode = 'same'))
+    discriminator.add(Convolution2D(64, 3, 3, border_mode='same'))
+    discriminator.add(MaxPooling2D((2, 2), border_mode = 'same'))
+    discriminator.add(Convolution2D(96, 3, 3, border_mode='same'))
+    discriminator.add(MaxPooling2D((2, 2), border_mode = 'same'))
+    discriminator.add(Convolution2D(128, 3, 3, border_mode='same'))
+    discriminator.add(MaxPooling2D((2, 2), border_mode = 'same'))
+    discriminator.add(Convolution2D(96, 3, 3, border_mode='same'))
+    discriminator.add(MaxPooling2D((2, 2), border_mode = 'same'))
+    discriminator.add(Convolution2D(64, 3, 3, border_mode='same'))
+
+    generator = Sequential()
+
+    discriminator.compile(optimizer='rmsprop', loss='binary_crossentropy')
+    print(discriminator.output)
+    fn = theano.function([discriminator.input], discriminator.output)
 
 if __name__ == '__main__':
-    hehexd()
+    keras_DCGAN()

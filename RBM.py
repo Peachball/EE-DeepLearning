@@ -123,10 +123,10 @@ class ConvRBMLayer:
             theano_rng=T.shared_randomstreams.RandomStreams()):
 
         self.theano_rng = theano_rng
-        self.c = init_weights(in_dim, init_type='uniform', scale=-1)
-        self.b = init_weights(out_filters, init_type='uniform', scale=-1)
+        self.c = init_weights(in_dim, init_type='zeros', scale=-1)
+        self.b = init_weights(out_filters, init_type='zeros', scale=-1)
         self.w = init_weights((out_filters, in_dim) + filt_size,
-                init_type='uniform', scale=-1)
+                init_type='zeros', scale=-1)
 
         self.params = [self.w, self.b, self.c]
 
@@ -205,12 +205,12 @@ class ConvRBMLayer:
         sig_sample = sig_samples[-1]
         upd = list(updates.items()) + [(persistent, new_chain)]
         energy = T.mean(self.free_energy(v)) -\
-                T.mean(self.free_energy(new_chain))
+                T.mean(self.free_energy(sig_sample))
 
         if not sparsity is None and not sparsity == False:
             energy = energy + sparsity * T.mean(T.sqr(self.w))
 
-        grad = T.grad(energy, self.params, consider_constant=[new_chain])
+        grad = T.grad(energy, self.params, consider_constant=[sig_sample])
         return upd, energy, grad
 
     def getCDUpdates(self, v, cd_size, steps=1, pooling=None):
@@ -373,17 +373,15 @@ def basic_ConvRBMTester():
 def med_ConvRBMTester():
     plt.ion()
     img = load_simple_image('color.png')
-    plt.imshow(img[0].transpose(1, 2, 0))
-    rbm = ConvRBMLayer(3, 3, (3, 3))
-    print(rbm.params)
+    rbm = ConvRBMLayer(3, 12, (3, 3))
     weights = np.zeros((3, 3, 3, 3), dtype='float32')
     weights[:,:,1,1] = 1
-    rbm.params[0].set_value(weights)
-    rbm.params[1].set_value(np.zeros((3,), dtype='float32') - 0.5)
-    rbm.params[2].set_value(np.zeros((3,), dtype='float32') - 0.5)
+    # rbm.params[0].set_value(weights)
+    # rbm.params[1].set_value(np.zeros((3,), dtype='float32') - 0.5)
+    # rbm.params[2].set_value(np.zeros((3,), dtype='float32') - 0.5)
     X = T.tensor4()
     upd, energy, grad = rbm.getCDUpdates(X, 1, steps=2)
-    gradUpdates = getMomentumUpdates(grad, rbm.params, alpha=0.1, momentum=0.0)
+    gradUpdates = getMomentumUpdates(grad, rbm.params, alpha=0.01, momentum=0.9)
     updates = upd + gradUpdates
     learn = theano.function([X], energy, updates=updates, allow_input_downcast=True)
     generate = theano.function([X], rbm.mean_vhv(X), updates=upd, allow_input_downcast=True)
@@ -391,9 +389,20 @@ def med_ConvRBMTester():
     for i in range(1000):
         e = learn(img)
         print("Energy: ", e)
-        generated = generate(img)[0].transpose(1, 2, 0) * 255
-        print(generated.max())
-        plt.imshow(generate(img)[0].transpose(1, 2, 0) * 255)
+        generated = generate(img)[0].transpose(1, 2, 0)
+        print(generated.max(), generated.min())
+        plt.subplot(2, 2, 1)
+        plt.imshow(generate(img)[0].transpose(1, 2, 0))
+        plt.subplot(2, 2, 2)
+        plt.imshow(img[0].transpose(1, 2, 0))
+
+        plt.subplot(2, 2, 3)
+        plt.cla()
+        plt.hist(generated.flatten() * 255, bins=256)
+
+        plt.subplot(2, 2, 4)
+        plt.cla()
+        plt.hist(rbm.params[0].get_value().flatten(), bins=100)
         plt.pause(0.05)
 
 if __name__== '__main__':

@@ -146,6 +146,13 @@ def init_weights(shape, init_type='uniform', scale=-1, shared_var=True,
             return theano.shared(np.random.uniform(low=-s, high=s,
                 size=shape).astype(theano.config.floatX), name=name)
 
+    if init_type == 'zeros':
+        if not shared_var:
+            return np.zeros(shape).astype(theano.config.floatX)
+        else:
+            return theano.shared(np.zeros(shape).astype(theano.config.floatX))
+
+
 def generateHessian(params, error, alpha=1, verbose=False):
     if verbose:
         print("Calculating Updates")
@@ -865,10 +872,12 @@ def scaleBack(x, scale, dim=0, type='range'):
 from PIL import Image
 
 def convertImageToArray(index, size=(100, 100)):
-    filename = 'imageDataSet/' + str(index)
-    im = Image.open(filename)
-    if size:
-        im.thumbnail(size, Image.ANTIALIAS)
+    from os.path import join, isfile
+    from os import listdir
+    files = [join('hehexdDataSet', f) for f in listdir('hehexdDataSet') if isfile("hehexdDataSet/"+f)]
+    im = Image.open(files[index])
+    if not size is None:
+        im = im.resize(size)
     im.load()
     return np.asarray(im)
 
@@ -965,40 +974,50 @@ def KerasConvolutionDreamerTest():
     from keras.layers import Input
     from keras.models import Model
     from keras.layers import Convolution2D, MaxPooling2D, UpSampling2D
+    from keras.optimizers import RMSprop
 
     def showImage(img):
         img = np.squeeze(img)
-        plt.figure()
         plt.imshow(img.transpose(1, 2, 0))
         pass
 
     image = convertImageToArray(3, size=(800, 800))
+    image2 = convertImageToArray(0, size=(800,800))
     image = image.transpose(2, 1, 0)
     image = image[np.newaxis,:]
 
-    scale, image = normalize(image)
-    showImage(scaleBack(image, scale))
+    image = image.astype('float32') / 255
+    showImage(image)
     plt.show()
 
     pic = Input(shape=(3, 800, 800))
 
-    encoder = Convolution2D(3, 15, 15, activation='relu',
+    encoder = Convolution2D(16, 3, 3, activation='relu',
             border_mode='same')(pic)
     encoder = MaxPooling2D((2, 2), border_mode='same')(encoder)
 
-    decoder = Convolution2D(3, 15, 15, activation='linear',
-            border_mode='same')(encoder)
-    decoder = UpSampling2D((2, 2))(decoder)
+    decoder = UpSampling2D((2, 2))(encoder)
+    decoder = Convolution2D(3, 3, 3, activation='relu',
+            border_mode='same')(decoder)
 
     model = Model(input=pic, output=decoder)
 
-    model.compile(optimizer='adadelta', loss='mse')
+    rms = RMSprop(lr=0.001)
+    model.compile(optimizer='adam', loss='mse')
 
-    model.fit(image, image, nb_epoch=1)
-
-    showImage(scaleBack(model.predict(image), scale))
-    plt.show()
+    for i in range(10):
+        model.fit(image, image, nb_epoch=20)
+        generate = model.predict(image)
+        for j in range(10):
+            generate = model.predict(generate)
+        plt.subplot(221)
+        showImage(np.clip(model.predict(image), 0, 1))
+        plt.subplot(222)
+        showImage(np.clip(generate, 0, 1))
+        plt.subplot(223)
+        showImage(image)
+        plt.show()
 
 
 if __name__ == '__main__':
-    HessianTester()
+    KerasConvolutionDreamerTest()

@@ -213,12 +213,8 @@ functions.
 Convolutional networks are simply an element of a neural network, in which a
 filter is applied to all the elements in the input, in some pattern. Typically,
 this filter is a n by n matrix, that applied onto an image through multiplying
-each pixel value with the corresponding filter value. 
-\begin{figure}[H]
-	\centering
-	\caption{Convolutional Filter}
-	\includegraphics[width=0.8\textwidth]{convolutionFilter.jpg}
-\end{figure}
+each pixel value with the corresponding filter value.
+
 Convolution neural networks are typically used for computer vision technologies,
 as elements in an image are generally more related to each other if they are
 closer to each other. However, convolutional networks can also be used in time
@@ -227,7 +223,9 @@ Abdel-Hamid~\cite{convrnn}.
 
 Furthermore, the startup company bought by Google, known as Deep Mind,
 successfully utilized the idea of convolutional networks to model music and
-speech, which demonstrates the potential power of convolutional nets.
+speech, which demonstrates the potential power of convolutional nets. Their
+model, known as WaveNet, uses a neural network with no fully connected layers,
+to predict the part of a piece of music or any piece of audio~\cite{wavenet}
 
 
 \subsection{Autoencoder}
@@ -240,12 +238,6 @@ connecting the input to the hidden layer is generally referred to as the encoder
 , and the weights connecting the hidden layer to the output layer is referred to
 as the decoder. The hidden layer of the autoencoder is typically passed to more
 unsupervised learning algorithms, or the primary model that is to be used.
-
-\begin{figure}[H]
-	\centering
-	\caption{Simple autoencoder}
-	\includegraphics[width=0.7\textwidth]{autoencoderDiagram.jpg}
-\end{figure}
 
 The type of autoencoder used in this project will have sigmoid activation
 functions, and be trained against mean squared error. The decoder part of the
@@ -378,33 +370,83 @@ The networks were then trained on the data with a GTX 960M, to speed up
 training. Also the reason why only 5 epochs were used was also to save time, as
 a large variation of models were being tested.
 
-
+\section{Data Collected}
 \begin{table}[H]
 	\begin{tabular}{c|c}
-		Model type: & Time model took to train 3 epochs \\\hline
-		1 Layer GRU& \\
-		2 Layer GRU& \\
-		3 Layer GRU& \\
-		1 Layer Clockwork RNN& \\
-		2 Layer Clockwork RNN& \\
-		3 Layer Clockwork RNN& \\
-		1 Layer LSTM& \\
-		2 Layer LSTM& \\
-		3 Layer LSTM& \\
+		Model type: & Time model took to train 5 epochs \\\hline
+		1 Layer GRU& 215 \\
+		2 Layer GRU& 507\\
+		3 Layer GRU& 761\\
+		1 Layer Clockwork RNN& 393\\
+		2 Layer Clockwork RNN& 892\\
+		3 Layer Clockwork RNN& 1346\\
+		1 Layer LSTM& 311\\
+		2 Layer LSTM& 620\\
+		3 Layer LSTM& 1868\\
+		1 Layer Vanilla RNN& 79\\
+		2 Layer Vanilla RNN& 169\\
+		3 Layer Vanilla RNN& 254\\
 	\end{tabular}
 	\caption{Time each tested model took to run 5 epochs}
 \end{table}
 
+\begin{figure}[H]
+	\includegraphics[width=0.8\textwidth]{1LayerComparison.png}
+	\caption{Graph comparing error rates of various 1 layer recurrent networks
+	during training}
+	\label{fig:1layer}
+\end{figure}
 
-The restricted boltzmann machine and autoencoder did not decrease their
-reconstruction error to a significant amount, and did not even overfit the
-data when they had enough hidden units, which suggests that they were
-implemented poorly or that they take a significant amount of time to train.
-Thus, due to limitations in resources, they do not have benchmarks, while the
-other models do.
+Based on figure~\ref{fig:1layer}, the collected data reveals that with one
+layer, all the recurrent network types have similar errors. However, it should
+be noted that the scale is logarithmic, and also that the models do not seem to
+decrease their error significantly over the iterations suggesting that perhaps
+the impelementation of the training of the models was incorrect. However, the
+graph depicting the error rates of the 3 layered models is clearer.
+
+\begin{figure}[H]
+	\includegraphics[width=0.8\textwidth]{3LayerComparison.png}
+	\caption{Graph comparing error rates of various 3 layer recurrent networks
+	during training}
+	\label{fig:3layer}
+\end{figure}
+
+After considering figure~\ref{fig:3layer}, it becomes obvious that the model
+requiring the least iterations to converge the quickest to a low error rate is
+the 3 layer GRU, followed by the 3 layer clockwork recurrent network. The LSTM
+error rate is significantly higher than the rest of the models, suggesting that
+perhaps the model was implemented incorrectly.
+
+The restricted Boltzmann machine and autoencoder did not decrease their
+reconstruction error to a significant amount, and did not even overfit the data
+when they had more hidden units than the visible units, which suggests that they
+were implemented poorly or that they take a significant amount of time to train.
+Nonetheless, because of their significantly poor results, they were not utilized
+in this paper, and thus, do not have any benchmarks.
 
 \section{Observations}
+Although the clockwork recurrent neural network was thought to be faster, it
+seems that the GRU and LSTM outperformed it in terms of speed. Thus, it seems in
+terms of time efficiency, the GRU is one of the faster one, with the standard
+vanilla recurrent network being the fastest by far. The vanilla recurrent neural
+network also had comparable errors to the other models, which makes it seem like
+the best choice in terms of music generation.
 
+The error of the LSTM seems to be the highest at all times, suggesting that
+perhaps the LSTM takes significantly longer to train or that the LSTM simply
+does not have as much modeling power as a simple vanilla recurrent network,
+which is difficult to believe, simply due to how much more complex the LSTM
+model is compared to the original recurrent network.
+
+\section{Conclusion}
+Based on the benchmarks taken, it seems that in terms of speed, the vanilla
+recurrent network is the fastest recurrent network for music generations.
+However, in terms of the most accurate recurrent network model, the GRU is the
+most effective, as demonstrated by the lower error rates that the GRU obtained
+on the data in this experiment. However, as the error rates between all the
+networks seemed similar, perhaps the most important factor in the training of a
+recurrent network for music generation is speed, suggesting that perhaps the
+vanilla recurrent network is the best network for training to generate music.
 
 \section{Appendix}
 As the code is extremely lengthy, it is stored separately. To view the code,
@@ -467,6 +509,10 @@ refer to \href{https://github.com/Peachball/EE-DeepLearning}.
 		Petrov, Slav. ``Announcing SyntaxNet: The World's Most Accurate Parser
 		Goes Open Source.'' \textit{Google Research Blob}, 12 May 2016. Web. 20
 		Aug. 2016.
+
+	\bibitem{wavenet}
+		Oord, Aaron van den, et al. "WaveNet: A Generative Model for Raw Audio."
+		arXiv preprint arXiv:1609.03499 (2016). Web. 1 Oct. 2016.
 
 	\bibitem{gru}
 		Chung, Gulcehre, Cho, and Bengio. ``Empirical Evaluation of Gated
