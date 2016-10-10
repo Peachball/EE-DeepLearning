@@ -9,11 +9,14 @@
 \usepackage[american]{babel}
 \usepackage{csquotes}
 \usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{verbatim}
 
 \geometry{margin=1in}
 \graphicspath{{EEimages/}}
 
 \begin{document}
+\doublespacing
 \author{Chen Xu}
 \title{Effectiveness of Various Deep Learning Algorithms on Music Generation}
 \maketitle
@@ -38,88 +41,88 @@ file that they are trying to model.
 
 Although the models may have different structures, in general all the listed
 models, have some cost function that they are trying to minimize. Typically, and
-in this paper, the cost function is assumed to be minimized through calculating
-the gradient of the cost function with respect to the weights, and then
-subtracting the gradient from the weights. This is known as gradient descent.
+in this paper, the cost function is assumed to be minimized with gradient
+descent.  As further elaborated by Sebastian Ruder, a Ph.D student in natural
+language processing, gradient descent is an algorithm in which the gradient of a
+function with respect to some parameter of the function is multiplied by some
+factor, and then the parameter is updated through subtracting the calculated
+product of the gradient and factor~\cite{graddescent}
 
 \subsection{Logistic Regression Model}
 To understand learning algorithms, the logistic regression model is notable, as
-it is the fundamental building block for larger models. Logistic regression
-models are classification modles.
-%This model predicts a
-%class based on an input vector of data. Given that: 
-%$$ \textrm{The input vector} = x$$
-%and that any value represented by W is a weight matrix that the model learns,
-%the logistic regression model can be represented as:
-%$$ \textrm{output} = \sigma(x\cdot W) $$
-%where:
-%$$\sigma(x) = \frac{1}{1 + e^{-x}} $$
-%However, this model typically also includes a bias term, to improve performance,
-%changing the equation to:
-%$$ \textrm{output} = \sigma(x\cdot W + b) $$
+it can be thought of a building block for larger models. As described by Andrew
+Ng's online course on machine learning, logistic regression
+models are classification models~\cite{ngcourse}.
 
 This means that they are typically used to predict the probability of a
-situation or event, based on data. For example, it could be used to predict how
-likely someone is to develop cancer based on the data relating to the medical
-history of the patient.
+situation or event, based on data. One example used Ng's course describing these
+models is the problem of determining how likely someone is to develop cancer
+based on the data relating to the medical history of the patient~\cite{ngcourse}.
 
-They do this through first converting the existing data, such as medical
-records, into a vector of numbers. Then, the model multiplies a weight value to
-each input number, and sums up the products of weight value with input numbers.
-The weight can be thought of as the significance of each input, and the sign
-being whether or not the input value is positively or negatively correlated to
-the data. After summing the product of weight values with input values, the sum
-is passed into the logistic function, which changes the sum into a value between
-0 and 1. This new value, between 0 and 1 is the probability of an event
-happening, and is compared against the correct value, being whether or not the
-event, such as cancer, did or did not happen based on the data.
+One method in which they could be used, as described in Ng's machine learning
+course, is through first converting the existing data, such as medical records,
+into a vector of numbers~\cite{ngrepr}. Then, continuing off of the description
+from the course, the model multiplies a weight value to each input number, and
+sums up the products of weight value with input numbers~\cite{ngrepr}. The
+weight can be thought of as the significance of each input, and the sign being
+whether or not the input value is positively or negatively correlated to the
+data. After summing the product of weight values with input values, the sum is
+passed into the sigmoid function, which changes the sum into a value between 0
+and 1 as Ng describes~\cite{ngrepr}. This new value, between 0 and 1 is the
+probability of an event happening, and is compared against the correct value,
+being whether or not the event, such as cancer, did or did not happen based on
+the data~\cite{ngrepr}.
 
-These models, however, are generally too simplistic to model complicated
-scenarios in the world.
+These models, however, have limitations as to how complex the data in which they
+can model.
 
 \subsection{Neural Networks}
 To understand the other models, one must first understand what a neural network
-is. Neural networks are a type of model, that attempts to try to learn patterns
-within data through stacking logistic regression models on each other. A
-logistic regression model predicts a value between 0 and 1 given some data.  To
-stack logistic regression classifiers means to put the output of one set of
-classifiers as the input as the next set of classifiers. Through this, a neural
-network is created.  The neural network was inspired by biological systems, as
-the outputs of each classifier can be thought of as activations for synapses in
-a brain. These types of models can generally model more complex data than other
-models in machine learning literature currently. In practice, however, a neural
-network is just a series of matrix operations on an input vector, to calculate
-the desired output vector.
+is. As explained in Michael Nielsen's online book, neural networks are a type of
+model, that attempts to try to learn patterns within data through a method of
+modeling neurons in the brain with sigmoid functions~\cite{nielbook}. A logistic
+regression model predicts a value between 0 and 1 given some data as previously
+mentioned~\cite{ngrepr}. To stack logistic regression classifiers means to put
+the output of one set of classifiers as the input as the next set of
+classifiers. Through this, a neural network is created. As implied by Nielsen's
+description of neural networks in his book, the neural network was inspired by
+biological systems, since the outputs of each classifier can be thought of as
+activations for synapses in a brain~\cite{nielbook}. Because neural network
+models have more weights and layers than logistic regression classifiers,
+intuitively it seems that neural networks are more powerful in what types of
+data they can represent.
+
 
 \subsection{Deep Learning}
-Deep learning simply takes the idea of neural networks, but makes them
-significantly larger. Typical neural networks only have 2 through 4 layers,
-where each layer is essentially a logistic regression classifier. However,
-increasing the number of layers to numbers such as 10 presents considerable
-challenges, as it not only takes much longer to compute gradients for the
-weights of the network, but the gradients also have a tendency to be too small
-or too large, resulting in inefficient training. This problem will be addressed
-through using gradient descent algorithms that are not reliant on the magnitude
-of the gradient.
+Deep learning in this paper will be interpreted as is interpreted in LeCun et
+al.'s presentation: any model with ``multiple levels of
+abstraction''~\cite{dlppt}.  Some neural networks only have 2 through 4 layers,
+where each layer is essentially a logistic regression classifier.  However, as
+mentioned in Nielsen's book about machine learning, increasing the number of
+layers to numbers such as 10 presents considerable challenges, as it not only
+takes much longer to compute gradients for the weights of the network, but the
+gradients also have a tendency to be too small or too large, resulting in
+inefficient training~\cite{nielgrad}. This problem will be addressed through
+using gradient descent algorithms that are designed to avoid this problem.
 
-Deep learning algorithms however, are capable of much more complex tasks than
-neural networks, due to their increased size. Some applications of these deep
-networks is SyntaxNet, an algorithm that can correctly determine the grammatical
-structure of a sentence, such as determining what the direct object of a
-sentence is~\cite{syntaxnet}.
+Deep learning algorithms however, are capable of complex tasks , potentially due
+to their increased size. For example, one applications of these deep networks is
+SyntaxNet, an algorithm that can correctly determine the grammatical structure
+of a sentence, such as determining what the direct object of a sentence
+is~\cite{syntaxnet}.
 
 
 \subsection{Vanilla Recurrent Neural Networks}
-Recurrent networks are a variation of neural networks that can model time series
-data. This is typically used in speech recognition, as the meaning of a sound in
-speech is dependent on the sounds preceding it. Vanilla recurrent neural
-networks accomplish this task through being a neural network, except with some
-connections going through time.  The activation of a hidden node can be
-considered as 
+According to Orr's class website at Willamette University, recurrent networks
+are a variation of neural networks that can model time series data, which is as
+a result, can be used in natural language processing tasks~\cite{rnnintro}. As
+Orr elabroates, vanilla recurrent neural networks accomplish this task through
+being a neural network, except with some connections going through
+time~\cite{rnnintro}. In this paper, the activation of a hidden node can be considered as
 $$a_t = W\cdot a_{t-1} + W\cdot I_t + b_a$$
 where $a_t$ is the activation at time t, W is the corresponding weight matrix,
-$a_{t-1}$ is the activation of the node at one step before the time, and $I_t$
-is the input at that time. The activation typically goes through a nonlinearity,
+$a_{t-1}$ is the activation of the node at one time step earlier, and $I_t$
+is the input at that time. The activation goes through a nonlinearity,
 such as a sigmoid function before being passed to the next node. These models
 theoretically can model time series, but in practice they do not have much
 memory. As the length of the time series increases, these models become prone to
@@ -228,21 +231,21 @@ model, known as WaveNet, uses a neural network with no fully connected layers,
 to predict the part of a piece of music or any piece of audio~\cite{wavenet}
 
 
-\subsection{Autoencoder}
-Autoencoders are also a form of unsupervised learning algorithm, as they simply
-find a relationship within the data. They are useful as they can reduce the
-dimensionality of the data, making the computations faster for the recurrent
-neural network. An autoencoder is a two layer neural network, with the input
-layer and desired output both being a sample from the input data. The weights
-connecting the input to the hidden layer is generally referred to as the encoder
-, and the weights connecting the hidden layer to the output layer is referred to
-as the decoder. The hidden layer of the autoencoder is typically passed to more
-unsupervised learning algorithms, or the primary model that is to be used.
+%\subsection{Autoencoder}
+%Autoencoders are also a form of unsupervised learning algorithm, as they simply
+%find a relationship within the data. They are useful as they can reduce the
+%dimensionality of the data, making the computations faster for the recurrent
+%neural network. An autoencoder is a two layer neural network, with the input
+%layer and desired output both being a sample from the input data. The weights
+%connecting the input to the hidden layer is generally referred to as the encoder
+%, and the weights connecting the hidden layer to the output layer is referred to
+%as the decoder. The hidden layer of the autoencoder is typically passed to more
+%unsupervised learning algorithms, or the primary model that is to be used.
 
-The type of autoencoder used in this project will have sigmoid activation
-functions, and be trained against mean squared error. The decoder part of the
-model will utilize the identity for the activation function, being that no
-nonlinearity will be applied to the activations.
+%The type of autoencoder used in this project will have sigmoid activation
+%functions, and be trained against mean squared error. The decoder part of the
+%model will utilize the identity for the activation function, being that no
+%nonlinearity will be applied to the activations.
 
 \section{Training Techniques}
 Because of the aforementioned gradient problems, normal methods of minimizing
@@ -450,24 +453,9 @@ vanilla recurrent network is the best network for training to generate music.
 
 \section{Appendix}
 As the code is extremely lengthy, it is stored separately. To view the code,
-refer to \href{https://github.com/Peachball/EE-DeepLearning}.
-
+refer to online repository at: \url{https://github.com/Peachball/EE-DeepLearning}.
 
 \begin{thebibliography}{9}
-	\bibitem{deepnetworktrainers}
-		Larochelle, Hugo et al. ``Exploring Strategies for Training Deep Neural
-		Networks.'' \textit{Journal of Machine Learning Research} (2009): n\. pag.
-		Web. 10 May 2016.
-
-	\bibitem{dnn dimensionality}
-		Hinton, G.E. and Salakhutdinov, R. R. ``Reducing the Dimensionality of
-		Data with Neural Networks.'' \textit{Science} (2006). 504--507. Web. 10
-		May 2016
-
-	\bibitem{unsupervised}
-		Erhan, Dumitru et al. ``Why Does Unsupervised Pre-training Help Deep
-		Learning?'' \textit{University of Montreal}:201--208. Web. 10 May 2016.
-
 	\bibitem{rbm}
 		Hinton, Geoffrey. ``A Practical Guide to Training Restricted Boltzmann
 		Machines.'' \textit{University of Toronto (2010)}: 1--20. Web. 10 May
@@ -545,7 +533,54 @@ refer to \href{https://github.com/Peachball/EE-DeepLearning}.
 		Technology}, 2013. Web. 10 Sept. 2016.
 
 	\bibitem{graddescent}
-		%http://sebastianruder.com/optimizing-gradient-descent/index.html#gradientdescentvariants
+		Ruder, Sebestian. ``An Overview of Gradient Descent Algorithms.''
+		\textit{Sebestian Ruder}, 19 Jan. 2016,
+		\url{sebastianruder.com/optimizing-gradient-descent/index.html#gradientdescentvariants
+		}. Web. 10 Sept. 2016
+
+	\bibitem{ngcourse}
+		Ng, Andrew. ``Classification.'' \textit{Machine Learning}, Coursera.
+		Web. 6 Jul. 2016.
+
+	\bibitem{ngrepr}
+		Ng, Andrew. ``Hypothesis Representation.'' \textit{Machine Learning}, Coursera.
+		Web. 6 Jul. 2016.
+
+	\bibitem{nielbook}
+		Nielsen, Michael. ``Chapter 1: Using neural nets to recognize
+		handwritten digits.'' \textit{Neural Networks and Deep Learning},
+		\url{neuralnetworksanddeeplearning.com/chap1.html}. Web. 10 Sept. 2016.
+
+	\bibitem{nielgrad}
+		Nielsen, Michael. ``Chapter 5: Why are deep neural networks so hard to
+		train?'' \textit{Neural Networks and Deep Learning},
+		\url{neuralnetworksanddeeplearning.com/chap5.html}. Web. 10 Sept. 2016.
+
+	\bibitem{dlppt}
+		LeCun, Yann, Yoshua Bengio, and Geoffrey Hinton. "Deep learning." Nature
+		521.7553 (2015): 436-444. Web. 9 Oct. 2016
+
+	\bibitem{rnnintro}
+		Orr, Genevieve. \textit{CS-449: Neural Networks}. Willamette University,
+		1999,\url{www.willamette.edu/~gorr/classes/cs449/intro.html}. Web. 9
+		Oct. 2016.
 \end{thebibliography}
+
+%Cool sources that weren't mentioned in this paper
+\begin{comment}
+	\bibitem{deepnetworktrainers}
+		Larochelle, Hugo et al. ``Exploring Strategies for Training Deep Neural
+		Networks.'' \textit{Journal of Machine Learning Research} (2009): n\. pag.
+		Web. 10 May 2016.
+
+	\bibitem{dnn dimensionality}
+		Hinton, G.E. and Salakhutdinov, R. R. ``Reducing the Dimensionality of
+		Data with Neural Networks.'' \textit{Science} (2006). 504--507. Web. 10
+		May 2016
+
+	\bibitem{unsupervised}
+		Erhan, Dumitru et al. ``Why Does Unsupervised Pre-training Help Deep
+		Learning?'' \textit{University of Montreal}:201--208. Web. 10 May 2016.
+\end{comment}
 
 \end{document}
