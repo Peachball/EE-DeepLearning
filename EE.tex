@@ -1,4 +1,4 @@
-\documentclass{article}
+\documentclass[12pt]{article}
 
 \usepackage{float}
 \usepackage{caption}
@@ -109,7 +109,8 @@ Deep learning algorithms however, are capable of complex tasks , potentially due
 to their increased size. For example, one applications of these deep networks is
 SyntaxNet, an algorithm that can correctly determine the grammatical structure
 of a sentence, such as determining what the direct object of a sentence
-is~\cite{syntaxnet}.
+is~\cite{syntaxnet}. Because of these successes with deep architectures, they
+will be tested to see if they are powerful enough to generate music.
 
 
 \subsection{Vanilla Recurrent Neural Networks}
@@ -121,40 +122,53 @@ being a neural network, except with some connections going through
 time~\cite{rnnintro}. In this paper, the activation of a hidden node can be considered as
 $$a_t = W\cdot a_{t-1} + W\cdot I_t + b_a$$
 where $a_t$ is the activation at time t, W is the corresponding weight matrix,
-$a_{t-1}$ is the activation of the node at one time step earlier, and $I_t$
-is the input at that time. The activation goes through a nonlinearity,
-such as a sigmoid function before being passed to the next node. These models
-theoretically can model time series, but in practice they do not have much
-memory. As the length of the time series increases, these models become prone to
-``forgetting'' earlier samples in the input data. Thus, other more complicated
-models should probably be used for time series analysis.
+$a_{t-1}$ is the activation of the node at one time step earlier, and $I_t$ is
+the input at that time. The activation goes through a nonlinearity, such as a
+sigmoid function before being passed to the next node~\cite{rnnintro}. These
+models theoretically can model time series, and some examples given by Orr's
+class are speech recognition and learning the grammar of languages, but in
+practice they do not have much memory, as compared to other models, such as
+LSTM's~\cite{rnnintro}\cite{lstm}.  As the length of the time series increases,
+these models become prone to ``forgetting'' earlier samples in the input data,
+as demonstrated by Horchreiter 's paper, as recurrent nets were outperformed on
+tasks requiring long term memory by LSTM's~\cite{lstm}. Thus, other more
+complicated models should probably be used for the task of music generation, as
+intuitively, music seems to have long term dependencies.
+
 
 \subsection{Long Short Term Memory Networks}
-A model that attempts to overcome the short term memory of vanilla neural
-networks is the long short term memory network. These networks, through using
-cells and vectors that can be modified by the network, can store long term
-information. They do this through generating ``memories'', through the function:
-$$M = \tanh(W\cdot C + W\cdot I_t + b_M)$$ where C denotes the cell state of the
-network, as originally envisioned by Horchreiter~\cite{lstm}. However, these
-networks are significantly more computationally expensive, due to the
-significantly increased complexity of the model. As a result, tasks such as
-computing the gradient, the error, or predicting something with these models
-takes more time than a traditional recurrent neural network.
+A model that, developed by researches in the Technical Institute of Berlin,
+attempts to overcome the short term memory of vanilla neural networks and solve
+the vanishing gradient problem is the long short term memory
+network~\cite{lstm}. As described in Horchreiter's paper, these networks, through using cells and vectors that can be
+modified by the network, can store long term information~\cite{lstm}. They do this through
+generating ``memories'', through the function:
+$$M = \tanh(W\cdot C + W\cdot I_t + b_M)$$
+where C denotes the cell state of the network, as originally envisioned by
+Horchreiter~\cite{lstm}. However, these networks are more computationally
+expensive, due to the significantly increased complexity of the model, as the
+model has more weights and calculations required involving the memory cell, as
+found in my experiments. As a result, tasks such as computing the gradient, the
+error, or predicting something with these models takes more time than a
+traditional recurrent neural network, as the LSTM model took significantly
+longer on those tasks than the traditional networks.
 
-However, the accuracy of the LSTM can be improved if it is allowed to reset
-it's memory state. As originally suggested by Gers, if a LSTM's memory is
-multiplied by a ``forget gate'', which is a value between 0 and 1, the LSTM can
-predict even longer sequences~\cite{forgetgate}. Through forget gates, the memory of
+However, the accuracy of the LSTM can be improved if it is allowed to reset it's
+memory state. As originally suggested by Gers, if a LSTM's memory is multiplied
+by a ``forget gate'', which is a value between 0 and 1, the LSTM can predict
+even longer sequences~\cite{forgetgate}. Through forget gates, the memory of
 LSTM's are restrained from growing too large, which would cause the memory cells
-to be useless. Also, this addition of a forget gate intuitively, as useless
-memory should be discarded. The LSTM's in this paper will be assumed to have
-forget gates.
+to be useless~\cite{forgetgate}. Also, this addition of a forget gate
+intuitively, as useless memory should be discarded. In practice, what this might
+mean for music generation is that the theme of a song may completely shift, as
+the LSTM could have ``forgotten'' the structure of the song earlier. The LSTM's
+in this paper will be assumed to have forget gates.
 
 The LSTM accuracy can also be further improved through adding ``peephole
 connections''~\cite{lstmpeep}. These are simply a connection between the memory
 cell of the LSTM to the forget gates and remember gates. According to Gers'
 paper, through these peep hole connections, the LSTM can model short term
-changes and fluctuations more accurately.
+changes and fluctuations more accurately~\cite{lstmpeep}.
 
 During training of LSTM's, a notable technique that will be used it large
 initialization of the forget gate bias, which if not proper initialized, will
@@ -167,16 +181,17 @@ this paper will be trained faster.
 
 \subsection{Gated Recurrent Units}
 Another variation off of recurrent networks are gated recurrent units, which
-follow a similar approach to LSTMs. Instead of completely reassigning the models
-hidden state each timestep, it instead updates its hidden state through the
-equation:
+follow a similar approach to LSTMs. As defined in Cho et al., instead of
+completely reassigning the models hidden state each timestep, it instead updates
+its hidden state through the equation:
 $$h_t = (1 - z) * h_t + h'_t $$
 z is a unit that the model calculates, and is bounded between 0 and 1 with the
-sigmoid activation function. As a result, this type of network also has been
-found to have long term memories, making it comparable to the performance of
-LSTM's. These models also seem to be faster to compute than LSTM's, due to their
-lower number of weights. Thus, this model will also be tested against LSTM's in
-its performance.
+sigmoid activation function~\cite{gru}. As a result, this type of network also
+has been found to have long term memories, and has been found to be comparable
+to the performance of LSTM's according to the researchers at the University of
+Montreal~\cite{gru}. These models also seem to be faster to compute than LSTM's,
+perhaps due to their lower number of weights in my implementation. Thus, this
+model will also be tested against LSTM's in its performance.
 
 
 \subsection{Clockwork Recurrent Neural Network}
@@ -185,50 +200,50 @@ the clockwork recurrent neural network. Originally developed by Koutnik and his
 colleagues, these networks are identical to vanilla networks, except their
 hidden layer is partitioned~\cite{cw-rnn}. Each partition of hidden units is
 calculated for only some of the input, and thus is not updated at every time
-step. As a result, the partitions that are updated less often serve the purpose
-of being the memory for the network, and enable the model to ``remember'' better
-than normal recurrent networks. Also, these networks are less computationally
-expensive than long short term memory networks, resulting in faster compile and
-training times. In its original paper, it was concluded that it has
-significantly more representational power than LSTM's and GRU's with the same
-number of parameters, suggesting that this network is the most efficient network
-of them all~\cite{cw-rnn}.
+step~\cite{cw-rnn}. As a result, the partitions that are updated less often
+serve the purpose of being the memory for the network, and enable the model to
+``remember'' better than normal recurrent networks~\cite{cw-rnn}. Also, these
+networks are less computationally expensive than long short term memory
+networks, resulting in faster compile and training times~\cite{cw-rnn}. In its
+original paper, it was concluded that it has significantly more representational
+power than LSTM's and GRU's with the same number of parameters, suggesting that
+this network is the most efficient network of them all~\cite{cw-rnn}.
 
-\subsection{Restricted Boltzmann Machines}
-The restricted Boltzmann machine is an unsupervised learning algorithm that
-attempts to determine the distribution of a sample of input using an energy
-based model. This means that the model finds a way to map an ``energy'' to each
-input, and then probabilistically finds the lowest energy input. This is useful,
-as the model can be trained to associate known input data with lower energy, and
-randomly generated data with higher energy. Since this model generates hidden
-units to determine the energy of the system, the hidden units can be used as an
-input to another model. Typically, the hidden units of a restricted Boltzmann
-machine represent some higher level relationship within the data, for example,
-the edges of a picture, perhaps. Thus, they can be used to reduce the size of
-the input by a significant amount, and speed up the rest of training. Also,
-after learning the weights for the restricted boltzmann machine, it is typically
-used as a layer for the neural network, which typically speed up training.
-However, restricted boltzmann machines are falling out of favor nowadays due to
-other initialization techniques for neural networks, and other new activation
-functions.
+%\subsection{Restricted Boltzmann Machines}
+%The restricted Boltzmann machine is an unsupervised learning algorithm that
+%attempts to determine the distribution of a sample of input using an energy
+%based model. This means that the model finds a way to map an ``energy'' to each
+%input, and then probabilistically finds the lowest energy input. This is useful,
+%as the model can be trained to associate known input data with lower energy, and
+%randomly generated data with higher energy. Since this model generates hidden
+%units to determine the energy of the system, the hidden units can be used as an
+%input to another model. Typically, the hidden units of a restricted Boltzmann
+%machine represent some higher level relationship within the data, for example,
+%the edges of a picture, perhaps. Thus, they can be used to reduce the size of
+%the input by a significant amount, and speed up the rest of training. Also,
+%after learning the weights for the restricted boltzmann machine, it is typically
+%used as a layer for the neural network, which typically speed up training.
+%However, restricted boltzmann machines are falling out of favor nowadays due to
+%other initialization techniques for neural networks, and other new activation
+%functions.
 
-\subsection{Convolution Neural Network}
-Convolutional networks are simply an element of a neural network, in which a
-filter is applied to all the elements in the input, in some pattern. Typically,
-this filter is a n by n matrix, that applied onto an image through multiplying
-each pixel value with the corresponding filter value.
+%\subsection{Convolution Neural Network}
+%Convolutional networks are simply an element of a neural network, in which a
+%filter is applied to all the elements in the input, in some pattern. Typically,
+%this filter is a n by n matrix, that applied onto an image through multiplying
+%each pixel value with the corresponding filter value.
 
-Convolution neural networks are typically used for computer vision technologies,
-as elements in an image are generally more related to each other if they are
-closer to each other. However, convolutional networks can also be used in time
-series analysis, as demonstrated by the research done by
-Abdel-Hamid~\cite{convrnn}.
+%Convolution neural networks are typically used for computer vision technologies,
+%as elements in an image are generally more related to each other if they are
+%closer to each other. However, convolutional networks can also be used in time
+%series analysis, as demonstrated by the research done by
+%Abdel-Hamid~\cite{convrnn}.
 
-Furthermore, the startup company bought by Google, known as Deep Mind,
-successfully utilized the idea of convolutional networks to model music and
-speech, which demonstrates the potential power of convolutional nets. Their
-model, known as WaveNet, uses a neural network with no fully connected layers,
-to predict the part of a piece of music or any piece of audio~\cite{wavenet}
+%Furthermore, the startup company bought by Google, known as Deep Mind,
+%successfully utilized the idea of convolutional networks to model music and
+%speech, which demonstrates the potential power of convolutional nets. Their
+%model, known as WaveNet, uses a neural network with no fully connected layers,
+%to predict the part of a piece of music or any piece of audio~\cite{wavenet}
 
 
 %\subsection{Autoencoder}
@@ -256,89 +271,103 @@ investigated, although they will not all be tested.
 One method to alleviate the vanishing gradient problem is better weight
 initialization. As Glorot and Bengio found, the initialization of the weights
 affects the propagation of the gradient through the model~\cite{xavier}.
-Furthermore, random initialization with a sigmoid activation function causes
-problems, as typically the activation value will saturate, due to how the mean
-value for a sigmoid function is 0.5. What this means is that since the sigmoid
-function has a small gradient around x = 0, once
+Generally, poor initialization of neural networks in general causes the gradient
+to not be propagated as well through the network, and since the network is
+trained based on the gradients, the network will have slower convergence times
+with poor initialization~\cite{xavier}. However, with xavier initialization,
+these problems with gradient propagation are remedied, and networks
+theoretically train more quickly~\cite{xavier}
 
 \subsection{Rprop Trainer}
 A training method that was considered was RPROP, originally devised by
 Reidmiller and Braun~\cite{rprop}. This training method utilizes only the sign
 of the gradient, and has a stored matrix representing the magnitude in which the
-algorithm will update the parameters. The reason this method will be used, is
-because this algorithm is not affected by the vanishing gradient problem, or the
-exploding gradient problem, as the algorithm only worries about the sign of the
-gradient, being positive or negative. Furthermore, the algorithm approaches the
-minimum for the error function exponentially, as it will increase the magnitude
-of the update if the previous update was in the same direction as the current
-update. For example, if the first update added 1 to a parameter, and the second
-gradient was also positive, the second update would add 1 multiplied with some
-constant, being 1.2 in this case. As a result, the updates can potentially
-increase exponentially, and will find the gradient with less iterations.
-However, this algorithm can only be used for batch learning, and as a result, is
-significantly slower for larger datasets. As a result, this training method will
-not be used in this paper, although it works for smaller models.
+algorithm will update the parameters~\cite{rprop}. The reason this method will
+be considered is because this algorithm is not affected by the vanishing
+gradient problem, or the exploding gradient problem, as the algorithm is only
+dependent on the sign of the gradient, being positive or negative~\cite{rprop}.
+Furthermore, the algorithm approaches the minimum for the error function
+exponentially, as it will increase the magnitude of the update if the previous
+update was in the same direction as the current update. For example, if the
+first update added 1 to a parameter, and the second gradient was also positive,
+the second update would add 1 multiplied with some constant, being 1.2 in this
+case. As a result, the updates can potentially increase exponentially, and will
+find the gradient with less iterations.
+
+However, after implementing, it was discovered that because this algorithm can
+only be used for batch learning, it is significantly slower, as the entire
+training dataset must be loaded before the network can update any weights. Also,
+because the computer used does not have unlimited memory, it can only handle
+mini batch learning algorithms that do not require training on the entire data
+set at once anyways.  As a result, this training method will not be used in this
+paper, although it seemed to works for smaller models.
 
 \subsection{RMS Prop}
-A technique that was developed by Geoffrey Hinton in one of his lectures, this
-technique is a modification to the standard gradient descent method that in
-addition, keeps a moving average of the gradients squared~\cite{rmsprop}. Unlike
-gradient descent, instead of updating each weight through its gradient, it
-divides the calculated gradient by the average square root of the sum of
-previous gradients squared. As a result, if a weight constantly receives large
-gradients, the update will be divided by a larger value, resulting in the
-gradient update not being too large. Similarly, if a gradient for a weight is
-extremely small, the gradient will be divided by a smaller average gradient
-value, resulting in a larger gradient. Thus, the vanishing and exploding
-gradient problem can be resolved through this update mechanism, and furthermore,
-this mechanism can be used for mini batch learning as well as batch learning.
-Thus, this method is extremely powerful and will be used in the experiments.
+A technique that was developed by Geoffrey Hinton, considered by some to be the
+father of machine learning, this technique is a modification to the standard
+gradient descent method that in addition, keeps a moving average of the
+gradients squared~\cite{rmsprop}. Unlike gradient descent, instead of updating
+each weight through its gradient, it divides the calculated gradient by the
+average square root of the sum of previous gradients squared~\cite{rmsprop}. As
+a result, if a weight constantly receives large gradients, the update will be
+divided by a larger value, resulting in the gradient update not being too large.
+Similarly, if a gradient for a weight is extremely small, the gradient will be
+divided by a smaller average gradient value, resulting in a larger update for
+the weights. Thus, the vanishing and exploding gradient problem can be remedied
+to a certain extent through this update mechanism, and furthermore, this
+mechanism can be used for mini batch learning as well as batch learning. Because
+of how powerful this method is, it will be used in the experiments.
 
 \subsection{Back Propagation Through Time}
 The gradient for a recurrent neural network differs significantly from a neural
-network, in that it is dependent on all the data given to the network before it,
-whereas the gradient for a neural network given a data sample, is dependent only
-on that data sample. This process of finding the gradient throughout the
-previous data samples is known as back propagation through time, as to find the
-gradient, one needs to back propagate through the previous data samples, which
-are assumed to have occurred earlier in time. Thus, if the data sequence passed
-to a recurrent neural network is too long, then training the model will take a
-large amount of time.
+network, in that the gradient is dependent on all the data given to the network
+before it, whereas the gradient for a neural network given a data sample, is
+dependent only on that data sample. This process of finding the gradient
+throughout the previous data samples was developed by Werbos, and is known as
+back propagation through time, as to find the gradient, one needs to back
+propagate through the previous data samples, which are assumed to have occurred
+earlier in time~\cite{bptt}. However, if the data sequence passed to a recurrent
+neural network is too long, then training the model will take a large amount of
+time. Since it was found that the sample of music, being around 3 min long,
+takes up significant amounts of memory and time to calculate the
+gradient of with respect to the network with back propagation through time,
+back propagation through time was considered as a solution that would take too
+long.
 
-A modification to this algorithm can be made, to speed up the training, through
-learning parts of the data sequence at a time. The hidden variables of the
-recurrent model, such as the cell in a long short term memory network can be
-generated using the data. Then, instead of calculating the gradient with respect
-to all of the data samples, the gradient with respect to only the last, say, 100
-data samples can be utilized as an approximation of the gradient, which is
-significantly faster. However, as a result, the model will be even less able to
-learn long term patterns within the data, due to the gradient not being
-calculated with respect to all data samples.
+However, as described in Jaeger's summary of training recurrent networks, a
+modification to this algorithm can be made to speed up the training, through
+learning parts of the data sequence at a time~\cite{rnntrain}. Then, instead of
+calculating the gradient with respect to all of the data samples, the gradient
+with respect to only the last, perhaps, 200 data samples can be utilized as an
+approximation of the gradient, which is significantly faster. However, as a
+result, the model may not be able to learn long term patterns within the data,
+due to the gradient not being calculated with respect to all data samples.
 
 
-\subsection{Real Time Recurrent Learning}
-Although back propagation through time is simple to implement, it is expensive
-to calculate, as it requires a complete sequence of data. However, another
-derivation of the derivative of the cost function gives real time recurrent
-learning, which is only dependent on some stored variables, and one data sample.
-However, this algorithm requires storage of all of the gradients of each weight
-to each hidden unit. As a result, as large recurrent networks easily have large
-numbers of hidden units and weights, this algorithm increases the computational
-requirements of the recurrent network drastically. Furthermore, each learning
-step takes the order of O((hidden units)$^4$), according to Jaeger's calculatoins,
-resulting in very slow gradient updates for recurrent networks of moderate or
-larger size~\cite{rnntrain}. Thus, this method will not be utilized either.
+%\subsection{Real Time Recurrent Learning}
+%Although back propagation through time is simple to implement, it can be
+%expensive to calculate, as it requires a complete sequence of data, to fully
+%learn the data. However, another derivation of the derivative of the cost
+%function gives real time recurrent learning, which is only dependent on some
+%stored variables, and one data sample.  However, this algorithm requires storage
+%of all of the gradients of each weight to each hidden unit. As a result, as
+%large recurrent networks easily have large numbers of hidden units and weights,
+%this algorithm increases the computational requirements of the recurrent network
+%drastically. Furthermore, each learning step takes the order of O((hidden
+%units)$^4$), according to Jaeger's calculatoins, resulting in very slow gradient
+%updates for recurrent networks of moderate or larger size~\cite{rnntrain}. Thus,
+%this method will not be utilized either.
 
 
 \section{Comparison}
 Thus, this paper will compare the effectiveness of the various models, being
 LSTMs, Vanilla Recurrent Networks, and Clockwork Recurrent Neural Networks,
-along with different dimensionality reducing steps. The different dimensionality
-reducing techniques that will also be tested will be autoencoders, restricted
-Boltzmann machines, and convolutional layers.
+along with different dimensionality reducing steps.
+
 
 \section{Implementational Details}
-Python and Theano are used to test these models. Theano is considered to be very
+Python and Theano are used to test these models. Python is a programming
+language, and Theano is a library for python~\cite{theano}. Theano is considered to be very
 fast amongst the machine learning community, which is why it is used. Also, a
 gpu will be utilized to increase the performance of all models. The music
 utilized for the model will have come from Youtube. Also, as it was found that
@@ -393,6 +422,8 @@ a large variation of models were being tested.
 	\caption{Time each tested model took to run 5 epochs}
 \end{table}
 
+The graphs were all generated with an open source python plotting software,
+known as matplotlib~\cite{matplotlib}.
 \begin{figure}[H]
 	\includegraphics[width=0.8\textwidth]{1LayerComparison.png}
 	\caption{Graph comparing error rates of various 1 layer recurrent networks
@@ -420,12 +451,12 @@ the 3 layer GRU, followed by the 3 layer clockwork recurrent network. The LSTM
 error rate is significantly higher than the rest of the models, suggesting that
 perhaps the model was implemented incorrectly.
 
-The restricted Boltzmann machine and autoencoder did not decrease their
-reconstruction error to a significant amount, and did not even overfit the data
-when they had more hidden units than the visible units, which suggests that they
-were implemented poorly or that they take a significant amount of time to train.
-Nonetheless, because of their significantly poor results, they were not utilized
-in this paper, and thus, do not have any benchmarks.
+%The restricted Boltzmann machine and autoencoder did not decrease their
+%reconstruction error to a significant amount, and did not even overfit the data
+%when they had more hidden units than the visible units, which suggests that they
+%were implemented poorly or that they take a significant amount of time to train.
+%Nonetheless, because of their significantly poor results, they were not utilized
+%in this paper, and thus, do not have any benchmarks.
 
 \section{Observations}
 Although the clockwork recurrent neural network was thought to be faster, it
@@ -564,6 +595,21 @@ refer to online repository at: \url{https://github.com/Peachball/EE-DeepLearning
 		Orr, Genevieve. \textit{CS-449: Neural Networks}. Willamette University,
 		1999,\url{www.willamette.edu/~gorr/classes/cs449/intro.html}. Web. 9
 		Oct. 2016.
+
+	\bibitem{matplotlib}
+		Hunter, J.D. ``Matplotlib: A 2D graphics environment.''
+		\textit{Computing in Science \& Engineering}, vol 9, no. 3, 2007, pag.
+		90-95. Web. 9 Oct.  2016.
+
+	\bibitem{bptt}
+		Werbos, Paul J. ``Backpropagation Through Time: What It Does and How to
+		Do It.'' \textit{Proceedings of the IEEE}, vol. 78, no. 10, 1990,
+		\url{deeplearning.cs.cmu.edu/pdfs/Werbos.backprop.pdf}. Web. 11 Oct.
+		2016.
+
+	\bibitem{theano}
+		Bengio, Yoshua et al. \textit{Theano: A Python framework for fast
+		computation of mathematical expressions.}. Web.
 \end{thebibliography}
 
 %Cool sources that weren't mentioned in this paper
