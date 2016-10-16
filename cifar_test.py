@@ -405,42 +405,62 @@ def hyperconnection_test():
 
 def keras_control_test():
     from keras.layers import Dense, Convolution2D, MaxPooling2D, Flatten
+    from keras.layers import BatchNormalization, Dropout
     from keras.models import Sequential
     from keras.optimizers import SGD
 
+    act = 'softplus'
     model = Sequential()
-    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same',
+    model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same',
         input_shape=(3, 32, 32)))
     model.add(MaxPooling2D((2, 2), border_mode='same'))
 
-    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
-    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
+    model.add(BatchNormalization(axis=1))
+    model.add(Dropout(0.5))
+    model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
+    model.add(BatchNormalization(axis=1))
+    model.add(Dropout(0.5))
+    model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
     model.add(MaxPooling2D((2, 2), border_mode='same'))
 
-    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
-    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
+    model.add(BatchNormalization(axis=1))
+    model.add(Dropout(0.5))
+    model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
+    model.add(BatchNormalization(axis=1))
+    model.add(Dropout(0.5))
+    model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
     model.add(MaxPooling2D((2, 2), border_mode='same'))
-    model.add(Convolution2D(128, 3, 3, activation='relu', border_mode='same'))
+    model.add(BatchNormalization(axis=1))
+    model.add(Dropout(0.5))
+    model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
 
     model.add(Flatten())
 
+    model.add(BatchNormalization())
+    model.add(Dropout(0.5))
     model.add(Dense(100, activation='softmax'))
 
     sgd = SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
-    model.compile(optimizer='sgd', loss='categorical_crossentropy',
+    model.compile(optimizer=sgd, loss='categorical_crossentropy',
                 metrics=['accuracy'])
 
-    (X_dat, Y_dat), _ = get_data()
+    (X_dat, Y_dat), (X_val, Y_val) = get_data()
 
     try:
         model.load_weights('6layertest.h5')
     except Exception as e:
         print("Unable to load previous weights")
 
+    def get_val_accuracy(num=100):
+        prediction = model.predict_classes(X_val[:num])
+        correct = np.argmax(Y_val[:num], axis=1)
+        total_correct = np.sum(prediction == np.argmax(Y_val[:num], axis=1))
+        total = num
+        return 1.0 * total_correct / total
+
     while True:
         model.save_weights('6layertest.h5', overwrite=True)
-        model.fit(X_dat, Y_dat, nb_epoch=1)
-
+        model.fit(X_dat, Y_dat, nb_epoch=1, validation_split=0.2)
 
 def control_test():
     """

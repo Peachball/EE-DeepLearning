@@ -14,6 +14,95 @@ import random
 
 SAMPLE_RATE = 44100
 
+def rtrl():
+    IN_SIZE = 1
+    OUT_SIZE = 1
+    HIDDEN_SIZE = 10
+    lr = 0.01
+    X = T.vector('input')
+    Y_ = T.vector('label')
+    updates = []
+    gradUpdates = []
+
+    def sigm_derivative(x):
+        return T.nnet.sigmoid(x) * (1 - T.nnet.sigmoid(x))
+
+    def tanh_derivative(x):
+        return 1.0 - T.sqr(T.tanh(x))
+
+    def print_var(v):
+        print(theano.function([X, Y_], v, on_unused_input='ignore',
+        mode='DebugMode')(
+            np.array([1, 2]).astype('float32'),
+            np.array([1, 3, 4]).astype('float32')))
+        return
+
+    def get_weight(shape, scale=0.05, name=None):
+        return theano.shared(np.random.uniform(low=-scale, high=scale,
+            size=shape).astype('float32'), name=name)
+    w_xh = get_weight((HIDDEN_SIZE, IN_SIZE), name='x to h')
+    w_hh = get_weight((HIDDEN_SIZE, HIDDEN_SIZE), name='h to h')
+    w_ho = get_weight((OUT_SIZE, HIDDEN_SIZE), name = 'h to o')
+
+    h_tm1 = get_weight((HIDDEN_SIZE,), name='hidden state')
+    net_hidden = T.dot(w_hh, h_tm1) + T.dot(w_xh, X)
+    hidden = T.tanh(net_hidden)
+    updates.append((h_tm1, hidden))
+
+    output = T.dot(w_ho, hidden)
+    output.name = 'prediction'
+    J = T.mean(T.sqr(output - Y_))
+    gradUpdates.append((w_ho, w_ho - lr * T.grad(J, w_ho)))
+
+    hidden_derivative = tanh_derivative(net_hidden)
+    hh_grad = T.dot(w_hh.T, hidden_derivative)
+    wxh_grad = T.outer(X, hidden_derivative).T
+    whh_grad = T.dot(h_tm1, hidden_derivative.T)
+
+    sxh_grad = get_weight((HIDDEN_SIZE, IN_SIZE))
+    shh_grad = get_weight((HIDDEN_SIZE, HIDDEN_SIZE))
+
+    updatedxh_grad = sxh_grad * hh_grad.dimshuffle(0, 'x') + wxh_grad
+    updatedhh_grad = shh_grad * hh_grad.dimshuffle(0, 'x') + whh_grad
+
+    gradUpdates.append((sxh_grad, updatedxh_grad))
+    gradUpdates.append((shh_grad, updatedhh_grad))
+    gradUpdates.append((w_xh, w_xh
+        - lr * (T.grad(J, hidden).dimshuffle(0, 'x') * updatedxh_grad)))
+    gradUpdates.append((w_hh, w_hh
+        - lr * (T.grad(J, hidden).dimshuffle(0, 'x') * updatedhh_grad)))
+
+    print('compiling')
+    learn = theano.function([X, Y_], J, updates=updates + gradUpdates,
+            allow_input_downcast=True)
+
+    predict = theano.function([X], output, allow_input_downcast=True)
+
+    reset = theano.function([], [], updates=
+            [(sxh_grad, np.zeros((HIDDEN_SIZE, IN_SIZE)).astype('float32')),
+             (shh_grad, np.zeros((HIDDEN_SIZE, HIDDEN_SIZE)).astype('float32')),
+             (h_tm1, np.zeros((HIDDEN_SIZE,)).astype('float32'))])
+
+    predicted = []
+    x = convertMusicFile(0)
+    x = x[:,:-1]
+    y = x[1:]
+    x = x[:-1]
+    reset()
+    for i in range(10000):
+        print(learn(x[i], y[i]))
+
+    reset()
+
+    for i in range(10000):
+        predicted.append(predict(x[i]))
+
+    plt.subplot(211)
+    plt.plot(predicted)
+    plt.subplot(212)
+    plt.plot(y[:10000])
+    plt.show()
+
 def downloadMusicPlayList(outdir, playlist_url, num=50):
     import youtube_dl
     for i in range(num):
@@ -342,34 +431,37 @@ def testKerasLSTM():
     orgdata = convertMusicFile(0)
 
     orgdata = orgdata.astype('float32')
-    scale, data = normalize(wav_to_FT(orgdata))
+    scale, data = normalize(wav_to_FT(orgdata), type='gauss')
 
     #Build lstm model
     from keras.models import Sequential
-    from keras.layers import LSTM, Dense, TimeDistributed
+    from keras.layers import LSTM, Dense, TimeDistributed, GRU
     from keras.optimizers import RMSprop
 
     model = Sequential()
-    model.add(TimeDistributed(Dense(1024), input_shape=(128, 1024)))
-    model.add(LSTM(1024, return_sequences=True))
-    model.add(LSTM(1024, return_sequences=False))
+    model.add(GRU(1024, return_sequences=True, batch_input_shape=(1, 1, 1024),
+        stateful=True))
+    model.add(GRU(1024, return_sequences=True, stateful=True))
 
     model.compile(RMSprop(lr=0.001), 'mse')
 
 
     def generateSample(length=150, seed=None):
         if seed is None:
-            seed = data[:128]
+            seed = data[:1]
         song = seed
 
+        print("Generating song...")
         while song.shape[0] < length:
-            y = model.predict(seed[None,-128:])
-            song = np.concatenate((song, y), axis=0)
+            y = model.predict(song[None,-1:])
+            song = np.concatenate((song, y[:,0,:]), axis=0)
         song = np.squeeze(song)
 
-        generateMusicFile(FT_to_wav(scaleBack(song, scale)),
+        generateMusicFile(FT_to_wav(scaleBack(song, scale, type='gauss')),
                 open('test' + str(generateSample.count) + '.wav', 'wb'))
         generateSample.count += 1
+
+        print("Done with song")
 
     generateSample.count = 0
 
@@ -379,19 +471,26 @@ def testKerasLSTM():
         print("Unable to load weights")
 
     while True:
-        X_ex, Y_ex = create_examples(data, uniform=True)
-        generateSample(length=1024)
-        model.fit(X_ex, Y_ex)
+        X_ex, Y_ex = data[:-1], data[1:]
+        model.reset_states()
+        generateSample(length=150)
+        model.reset_states()
+        for i in range(X_ex.shape[0]):
+            e = model.train_on_batch(X_ex[None,i:i+1,:], Y_ex[None,i:i+1,:])
+            print("Iteration: {0:.4f} Error: {1}".format(i+1, e))
         model.save_weights("keras_musicgen.h5", overwrite=True)
 
-def get_data(index, channels='reg', chunk_size=1024):
+def get_data(index, channels='reg', chunk_size=1024, scale=None):
     od = convertMusicFile(index)
     od = od.astype('float32')
 
     if channels == 'mono':
         od = od[:,:-1]
     data = wav_to_FT(od, chunk_size=chunk_size)
-    scale, data = normalize(data, type='gauss')
+    if scale is None:
+        scale, data = normalize(data, type='gauss')
+    else:
+        _, data = normalize(data, type='gauss', scale=scale)
     return scale, data
 
 def trainLSTM():
@@ -405,7 +504,6 @@ def trainLSTM():
 
     predict = lstm.predict
     reset = lstm.reset
-
 
     print("Loading data")
     scale, data = get_data(1, 'mono', chunk_size=INPUT_SIZE)
@@ -618,4 +716,4 @@ def EEDataGenerator():
         test_model(x, y, o, params, predict, reset, str(i+1) + 'LayerCWRNN')
 
 if __name__ == '__main__':
-    trainLSTM()
+    testLSTM()

@@ -17,20 +17,20 @@ class RecurrentLayer:
         if hidden_size == None:
             hidden_size = max(in_size, out_size)
 
-        w_io = init_weights((in_size, out_size), init_type='xavier',
+        w_io = init_weights((in_size, out_size), init_type='uniform',
                 scale=init_size)
 
         w_ih = init_weights((in_size, hidden_size),
-        init_type='xavier', scale=init_size)
+                init_type='uniform', scale=init_size)
 
         w_hh = init_weights((hidden_size, hidden_size),
-                init_type='xavier', scale=init_size)
-        b_h = init_weights((hidden_size), init_type='xavier',
+                init_type='uniform', scale=init_size)
+        b_h = init_weights((hidden_size), init_type='uniform',
                 scale=init_size)
 
         w_ho = init_weights((hidden_size, out_size),
-                init_type='xavier', scale=init_size)
-        b_o = init_weights((out_size), init_type='xavier',
+                init_type='uniform', scale=init_size)
+        b_o = init_weights((out_size), init_type='uniform',
                 scale=init_size)
 
         self.hidden = theano.shared(
@@ -39,12 +39,12 @@ class RecurrentLayer:
         def recurrence(x, h_tm1):
             h_t =  h_nonlinearity(T.dot(x, w_ih) + T.dot(h_tm1, w_hh) +
                     b_h)
-            out = nonlinearity(T.dot(x, w_io) + T.dot(h_tm1, w_ho) +
+            out = nonlinearity(T.dot(x, w_io) + T.dot(h_t, w_ho) +
                     b_o)
-            return [out, h_t]
+            return [h_t, out]
 
-        ([out, hidden], updates) = theano.scan(recurrence,
-                sequences=x, outputs_info=[None, self.hidden], n_steps=x.shape[0])
+        ([hidden, out], updates) = theano.scan(recurrence,
+                sequences=x, outputs_info=[self.hidden, None], n_steps=x.shape[0])
 
         self.out = out
         self.updates = [(self.hidden, hidden[-1])]
@@ -500,8 +500,20 @@ class LSTM():
             p.set_value(params[n])
 
 
-def miniRecurrentLearning(x, y, batchSize, learn, predict, reset, verbose=False,
-        epochs=1, miniepochs=1, save=None, saveiters=None, strides=1, f=None):
+def miniRecurrentLearning(
+        x,
+        y,
+        batchSize,
+        learn,
+        predict,
+        reset,
+        verbose=False,
+        epochs=1,
+        miniepochs=1,
+        save=None,
+        saveiters=None,
+        strides=1,
+        f=None):
     """
     Train model on parts of a time series at a time
     e.g. given time seires : 1, 2, 3, 4, 5, 6
@@ -545,6 +557,7 @@ def miniRecurrentLearning(x, y, batchSize, learn, predict, reset, verbose=False,
                 f.write(str(train_error[-1]) + '\n')
                 f.flush()
             predict(x[batch:batch+strides])
+            reset()
         reset()
     return train_error
 
@@ -640,17 +653,19 @@ def RNNTest():
     x = T.matrix("in")
     y = T.matrix('target')
     l1 = RecurrentLayer(1, 10, in_var=x, init_size=0.01)
-    l2 = RecurrentLayer(10, 1, in_var=l1.out, init_size=0.01)
+    l2 = RecurrentLayer(10, 1, in_var=l1.out, init_size=0.01,
+            nonlinearity=lambda x:x)
     out = l2.out
 
-    predict = theano.function([x], out, updates=l1.updates+l2.updates)
+    predict = theano.function([x], out, updates=l1.updates+l2.updates,
+            allow_input_downcast=True)
     mse = T.mean(T.sqr(out - y))
 
     params = l1.params + l2.params
-    (m, adam) = generateAdam(params, mse, alpha=0.01)
-    (r, rprop) = generateRpropUpdates(params, mse, init_size=0.01)
+    (m, adam) = generateAdam(params, mse, alpha=0.1)
+    # (r, rprop) = generateRpropUpdates(params, mse, init_size=0.01)
 
-    learn = theano.function([x, y], mse, updates=rprop)
+    learn = theano.function([x, y], mse, updates=adam, allow_input_downcast=True)
 
     print("Compiled Learn Function!")
 
@@ -659,11 +674,19 @@ def RNNTest():
 
     train_error = []
     for i in range(1000):
+        l1.reset()
+        l2.reset()
         error = learn(s_x, s_y)
         print(error)
         train_error.append(error)
 
+    plt.subplot(211)
     plt.plot(np.arange(len(train_error)), train_error)
+    plt.subplot(212)
+    plt.plot(s_y)
+    l1.reset()
+    l2.reset()
+    plt.plot(predict(s_x))
     plt.show()
 
 def CWRNNTest():
@@ -716,4 +739,4 @@ def GRUTest():
     plt.show()
 
 if __name__ == "__main__":
-    LSTMTest()
+    RNNTest()
