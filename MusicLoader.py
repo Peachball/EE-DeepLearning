@@ -1,107 +1,18 @@
 import pickle
 import theano
-from DeepLearning import *
-from RBM import *
-from RecurrentNetworks import LSTM
-from RecurrentNetworks import miniRecurrentLearning
+from models.DeepLearning import *
+# from models.RBM import *
+from models.RecurrentNetworks import LSTM
+from models.RecurrentNetworks import miniRecurrentLearning
 import numpy as np
 import scipy.io.wavfile as wavUtil
 import matplotlib.pyplot as plt
-from RecurrentNetworks import *
 import scipy.fftpack
 import warnings
 import random
+from os.path import join
 
 SAMPLE_RATE = 44100
-
-def rtrl():
-    IN_SIZE = 1
-    OUT_SIZE = 1
-    HIDDEN_SIZE = 10
-    lr = 0.01
-    X = T.vector('input')
-    Y_ = T.vector('label')
-    updates = []
-    gradUpdates = []
-
-    def sigm_derivative(x):
-        return T.nnet.sigmoid(x) * (1 - T.nnet.sigmoid(x))
-
-    def tanh_derivative(x):
-        return 1.0 - T.sqr(T.tanh(x))
-
-    def print_var(v):
-        print(theano.function([X, Y_], v, on_unused_input='ignore',
-        mode='DebugMode')(
-            np.array([1, 2]).astype('float32'),
-            np.array([1, 3, 4]).astype('float32')))
-        return
-
-    def get_weight(shape, scale=0.05, name=None):
-        return theano.shared(np.random.uniform(low=-scale, high=scale,
-            size=shape).astype('float32'), name=name)
-    w_xh = get_weight((HIDDEN_SIZE, IN_SIZE), name='x to h')
-    w_hh = get_weight((HIDDEN_SIZE, HIDDEN_SIZE), name='h to h')
-    w_ho = get_weight((OUT_SIZE, HIDDEN_SIZE), name = 'h to o')
-
-    h_tm1 = get_weight((HIDDEN_SIZE,), name='hidden state')
-    net_hidden = T.dot(w_hh, h_tm1) + T.dot(w_xh, X)
-    hidden = T.tanh(net_hidden)
-    updates.append((h_tm1, hidden))
-
-    output = T.dot(w_ho, hidden)
-    output.name = 'prediction'
-    J = T.mean(T.sqr(output - Y_))
-    gradUpdates.append((w_ho, w_ho - lr * T.grad(J, w_ho)))
-
-    hidden_derivative = tanh_derivative(net_hidden)
-    hh_grad = T.dot(w_hh.T, hidden_derivative)
-    wxh_grad = T.outer(X, hidden_derivative).T
-    whh_grad = T.dot(h_tm1, hidden_derivative.T)
-
-    sxh_grad = get_weight((HIDDEN_SIZE, IN_SIZE))
-    shh_grad = get_weight((HIDDEN_SIZE, HIDDEN_SIZE))
-
-    updatedxh_grad = sxh_grad * hh_grad.dimshuffle(0, 'x') + wxh_grad
-    updatedhh_grad = shh_grad * hh_grad.dimshuffle(0, 'x') + whh_grad
-
-    gradUpdates.append((sxh_grad, updatedxh_grad))
-    gradUpdates.append((shh_grad, updatedhh_grad))
-    gradUpdates.append((w_xh, w_xh
-        - lr * (T.grad(J, hidden).dimshuffle(0, 'x') * updatedxh_grad)))
-    gradUpdates.append((w_hh, w_hh
-        - lr * (T.grad(J, hidden).dimshuffle(0, 'x') * updatedhh_grad)))
-
-    print('compiling')
-    learn = theano.function([X, Y_], J, updates=updates + gradUpdates,
-            allow_input_downcast=True)
-
-    predict = theano.function([X], output, allow_input_downcast=True)
-
-    reset = theano.function([], [], updates=
-            [(sxh_grad, np.zeros((HIDDEN_SIZE, IN_SIZE)).astype('float32')),
-             (shh_grad, np.zeros((HIDDEN_SIZE, HIDDEN_SIZE)).astype('float32')),
-             (h_tm1, np.zeros((HIDDEN_SIZE,)).astype('float32'))])
-
-    predicted = []
-    x = convertMusicFile(0)
-    x = x[:,:-1]
-    y = x[1:]
-    x = x[:-1]
-    reset()
-    for i in range(10000):
-        print(learn(x[i], y[i]))
-
-    reset()
-
-    for i in range(10000):
-        predicted.append(predict(x[i]))
-
-    plt.subplot(211)
-    plt.plot(predicted)
-    plt.subplot(212)
-    plt.plot(y[:10000])
-    plt.show()
 
 def downloadMusicPlayList(outdir, playlist_url, num=50):
     import youtube_dl
@@ -118,7 +29,7 @@ def downloadMusicPlayList(outdir, playlist_url, num=50):
             ydl.download([playlist_url])
 
 def convertMusicFile(index, inputsize=1000):
-    filename = 'musicDataSet/' + "{0:0=3d}".format(index) + '.wav'
+    filename = join('datasets','musicDataSet', "{0:0=3d}".format(index) + '.wav')
     samplerate, data = wavUtil.read(filename)
 
     #Get rid of quiet parts in the beginning and end
@@ -493,7 +404,7 @@ def get_data(index, channels='reg', chunk_size=1024, scale=None):
         _, data = normalize(data, type='gauss', scale=scale)
     return scale, data
 
-def trainLSTM():
+def trainGRU():
     CHANNELS = 1
     INPUT_SIZE = 2048
     lstm = GRU(*(4 * (INPUT_SIZE,)), nonlinearity=lambda x:x,
@@ -554,7 +465,7 @@ def trainLSTM():
     learn = theano.function([lstm.x, y_], error, updates=upd,
             allow_input_downcast=True)
     print("Commencing learning")
-    train_error = miniRecurrentLearning(X_dat, Y_dat, 200, learn, predict, reset,
+    train_error = miniRecurrentLearning(X_dat, Y_dat, 20, learn, predict, reset,
             verbose=True, epochs=10, save=save, saveiters=300, strides=1,
             f=error_file)
 
@@ -563,7 +474,9 @@ def trainLSTM():
 def EEDataGenerator():
     #Build models
     import time
-    timefile = open('times.txt', 'a')
+    from os.path import join
+    DATA_DIR = join('rundata', 'times.txt')
+    timefile = open(DATA_DIR, 'a')
     MODE = 'FAST_RUN'
 
     def construct_model(layers, m_type='lstm'):
@@ -662,7 +575,7 @@ def EEDataGenerator():
 
         duration = time.clock() - start_time
 
-        pickle.dump(train_error, open(name + '.data', 'wb'))
+        pickle.dump(train_error, open(join('data',name + '.data'), 'wb'))
 
         timefile.write(name + ' took ' + str(duration) + '\n')
         timefile.flush()
@@ -672,15 +585,8 @@ def EEDataGenerator():
     print(X_dat.min(), X_dat.max())
     Y_dat = X_dat[:1024]
 
-    #Test RBM
-
-    #Test overlapping LSTMs
-
-    #Test overlapping RNNs
-
-
     #Test lstms
-    for i in range(1,3):
+    for i in range(3):
         print("Constructing " + str(i+1) + " layer lstm")
         x, y, params, o, updates, reset = construct_model(i+1, m_type='lstm')
 
@@ -716,4 +622,4 @@ def EEDataGenerator():
         test_model(x, y, o, params, predict, reset, str(i+1) + 'LayerCWRNN')
 
 if __name__ == '__main__':
-    testLSTM()
+    EEDataGenerator()

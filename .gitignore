@@ -16,3 +16,6 @@ tags
 EE*
 
 !EE.tex
+datasets/
+rundata/
+trained_models/
