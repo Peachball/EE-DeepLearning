@@ -1,27 +1,20 @@
 import theano.tensor as T
 import theano
 import numpy as np
-from DeepLearning import *
+from models.DeepLearning import *
 import matplotlib.pyplot as plt
 from keras.models import Sequential
-from keras.layers import Dense, Activation, Reshape, BatchNormalization
-from keras.layers import Flatten
+from keras.layers import Dense, Activation, Reshape, BatchNormalization, Lambda
+from keras.layers import Flatten, Input
 from keras.layers.convolutional import Convolution2D, UpSampling2D, MaxPooling2D
 from keras.optimizers import SGD
+from keras import backend as K
 
-
-class PixelRNN():
-    '''
-        Follows the paper as closely as possible
-        https://arxiv.org/pdf/1601.06759v3.pdf
-    '''
-
-    def __init__(self, in_size, out_size, depth, cell_size):
-        pass
 
 def load_image(index, dataset='hehexdDataSet'):
     from os.path import join, isfile
     from os import listdir
+    dataset = 'datasets/' + dataset
     files = [f for f in listdir(dataset) if isfile(join(dataset, f))]
     if index >= len(files):
         index = index % len(files)
@@ -31,6 +24,17 @@ def load_image(index, dataset='hehexdDataSet'):
     img = img.convert('RGB')
     img = img.resize((1024, 1024))
     return np.array(img)
+
+def data_gen(batch_size=32):
+    index = 0
+    while True:
+        im = []
+        for i in range(batch_size):
+            im.append(load_image(index))
+            index += 1
+        im = np.array(im).astype('float32') / 255.0
+        im = im.transpose(0, 3, 1, 2)
+        yield im
 
 def load_images(r, dataset='hehexdDataSet'):
     if not isinstance(r, tuple):
@@ -136,9 +140,9 @@ def construct_generator(inp, weights, layers):
     o = add_upsample(o, (2, 2))
     o = add_conv_layer(o, (64, 128, 3, 3), (1,1), 'deconv8', weights, layers) #256x256
     o = add_upsample(o, (2, 2))
-    o = add_conv_layer(o, (32, 64, 3, 3), (1,1), 'deconv9', weights, layers) #512x512
+    o = add_conv_layer(o, (16, 64, 3, 3), (1,1), 'deconv9', weights, layers) #512x512
     o = add_upsample(o, (2, 2))
-    o = add_conv_layer(o, (3, 32, 3, 3), (1,1), 'deconv10', weights, layers,
+    o = add_conv_layer(o, (3, 16, 3, 3), (1,1), 'deconv10', weights, layers,
             act_type='sigmoid') #1024x1024
 
     return o
@@ -212,25 +216,54 @@ def hehexd():
             saveH5(all_param_map, savefile)
 
 def keras_DCGAN():
-    discriminator = Sequential()
-    discriminator.add(Convolution2D(32, 3, 3, border_mode='same',
-        input_shape=(3, 1024, 1024)))
-    discriminator.add(MaxPooling2D((2, 2), border_mode = 'same'))
-    discriminator.add(Convolution2D(64, 3, 3, border_mode='same'))
-    discriminator.add(MaxPooling2D((2, 2), border_mode = 'same'))
-    discriminator.add(Convolution2D(96, 3, 3, border_mode='same'))
-    discriminator.add(MaxPooling2D((2, 2), border_mode = 'same'))
-    discriminator.add(Convolution2D(128, 3, 3, border_mode='same'))
-    discriminator.add(MaxPooling2D((2, 2), border_mode = 'same'))
-    discriminator.add(Convolution2D(96, 3, 3, border_mode='same'))
-    discriminator.add(MaxPooling2D((2, 2), border_mode = 'same'))
-    discriminator.add(Convolution2D(64, 3, 3, border_mode='same'))
+    LATENT_DIM = 32
+    X = Input(shape=(3, 1024, 1024))
+    encoder = Sequential()
+    encoder.add(Convolution2D(32, 3, 3, border_mode='same',
+        input_shape=(3, None, None)))
+    encoder.add(MaxPooling2D((2, 2), border_mode = 'same')) # 512
+    encoder.add(Convolution2D(64, 3, 3, border_mode='same'))
+    encoder.add(MaxPooling2D((2, 2), border_mode = 'same')) # 256
+    encoder.add(Convolution2D(96, 3, 3, border_mode='same'))
+    encoder.add(MaxPooling2D((2, 2), border_mode = 'same')) # 128
+    encoder.add(Convolution2D(128, 3, 3, border_mode='same'))
+    encoder.add(MaxPooling2D((2, 2), border_mode = 'same')) # 64
+    encoder.add(Convolution2D(128, 3, 3, border_mode='same'))
+    encoder.add(MaxPooling2D((2, 2), border_mode = 'same')) # 32
 
-    generator = Sequential()
+    def sample(m):
+        m, log_var = m
+        norm = K.random_normal(shape=(32, LATENT_DIM, 32, 32),
+                mean=0.,
+                std=1.)
+        return norm * K.exp(log_var / 2) + m
 
-    discriminator.compile(optimizer='rmsprop', loss='binary_crossentropy')
-    print(discriminator.output)
-    fn = theano.function([discriminator.input], discriminator.output)
+    z_log_var = Convolution2D(LATENT_DIM, 3, 3, border_mode='same')(encoder(X))
+    z_mean = Convolution2D(LATENT_DIM, 3, 3, border_mode='same')(encoder(X))
+    z = Lambda(
+            sample,
+            output_shape=(LATENT_DIM, 32, 32))([z_mean, z_log_var])
+
+    decoder = Sequential()
+    decoder.add(Convolution2D(LATENT_DIM, 3, 3, border_mode='same',
+        input_shape=(3, None, None)))
+    decoder.add(UpSampling2D((2, 2)))
+    decoder.add(Convolution2D(128, 3, 3, border_mode='same'))
+    decoder.add(UpSampling2D((2, 2)))
+    decoder.add(Convolution2D(128, 3, 3, border_mode='same'))
+    decoder.add(UpSampling2D((2, 2)))
+    decoder.add(Convolution2D(96, 3, 3, border_mode='same'))
+    decoder.add(UpSampling2D((2, 2)))
+    decoder.add(Convolution2D(64, 3, 3, border_mode='same'))
+    decoder.add(UpSampling2D((2, 2)))
+    decoder.add(Convolution2D(32, 3, 3, border_mode='same'))
+    decoder.add(UpSampling2D((2, 2)))
+    decoder.add(Convolution2D(3, 3, 3, border_mode='same'))
+
+    encoder.compile(optimizer='sgd', loss='binary_crossentropy')
+
+    for d in data_gen():
+        pass
 
 if __name__ == '__main__':
-    keras_DCGAN()
+    hehexd()

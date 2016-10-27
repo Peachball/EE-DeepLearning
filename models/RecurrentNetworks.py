@@ -7,6 +7,24 @@ import matplotlib.pyplot as plt
 import time
 import math
 
+def _ln(tensor, g, b, epsilon=1e-6):
+    if tensor.ndim != 1:
+        raise Exception("Not supported yet")
+    mu = T.mean(tensor)
+    std = T.sqrt(T.mean(T.sqr(tensor - mu)) + epsilon)
+
+    return (g / std) * (tensor - mu) + b
+
+def _get_ones(shape):
+    return theano.shared(
+            np.ones(shape).astype(theano.config.floatX)
+            )
+
+def _get_zeros(shape):
+    return theano.shared(
+            np.zeros(shape).astype(theano.config.floatX)
+            )
+
 class RecurrentLayer:
 
     def __init__(self, in_size, out_size, in_var=T.matrix('input'),
@@ -189,9 +207,19 @@ class GRULayer:
         U_o = init_weights((cell_size, out_size), scale=init_size,
                 init_type=init_type)
 
-        self.params = [b_z, b_r, b_h, b_o, W, U, U_r, U_o]
+        g_x = _get_ones((cell_size,))
+        b_x = _get_zeros((cell_size,))
+
+        g_h = _get_ones((cell_size,))
+        b_h = _get_zeros((cell_size,))
+
+        self.params = [b_z, b_r, b_h, b_o, W, U, U_r, U_o, g_x, b_x]
 
         def recurrence(x, h_tm1):
+            # Layer Normalization
+            x = _ln(x, g_x, b_x)
+            h_tm1 = _ln(h_tm1, g_h, b_h)
+
             inp_result = T.dot(x, W)
             hid_result = T.dot(h_tm1, U)
             r_t = T.nnet.sigmoid(inp_result[:cell_size] +
@@ -205,7 +233,6 @@ class GRULayer:
             output = nonlinearity(
                     inp_result[(3*cell_size):(3*cell_size+out_size)] +
                     T.dot(h_t, U_o) + b_o)
-
 
             return h_t, output
 
@@ -260,7 +287,6 @@ class GRU:
         self.predict = theano.function([self.x], self.out, updates=self.updates,
                 allow_input_downcast=True)
         self.layers = layers
-        print("Done constructing gru")
         return
 
     def reset(self):

@@ -1,8 +1,7 @@
 import pickle
 import theano
 from models.DeepLearning import *
-# from models.RBM import *
-from models.RecurrentNetworks import LSTM
+from models.RecurrentNetworks import LSTM, GRU
 from models.RecurrentNetworks import miniRecurrentLearning
 import numpy as np
 import scipy.io.wavfile as wavUtil
@@ -29,6 +28,8 @@ def downloadMusicPlayList(outdir, playlist_url, num=50):
             ydl.download([playlist_url])
 
 def convertMusicFile(index, inputsize=1000):
+    INDEX_NUM = 49
+    index = index % INDEX_NUM
     filename = join('datasets','musicDataSet', "{0:0=3d}".format(index) + '.wav')
     samplerate, data = wavUtil.read(filename)
 
@@ -401,7 +402,7 @@ def get_data(index, channels='reg', chunk_size=1024, scale=None):
     if scale is None:
         scale, data = normalize(data, type='gauss')
     else:
-        _, data = normalize(data, type='gauss', scale=scale)
+        _, data = normalize(data, type='gauss', scaleFactor=scale)
     return scale, data
 
 def trainGRU():
@@ -417,24 +418,24 @@ def trainGRU():
     reset = lstm.reset
 
     print("Loading data")
-    scale, data = get_data(1, 'mono', chunk_size=INPUT_SIZE)
-    X_dat = data[:-1]
-    Y_dat = data[1:]
+    scale, X_dat = get_data(1, 'mono', chunk_size=INPUT_SIZE)
 
-    error_file = open('gausslstmerror.txt', 'a')
+    error_file = open('rundata/gausslstmerror.txt', 'a')
 
     model_name = 'gaussbiglstm'
     def save():
-        saveParams(lstm.params, model_name)
-        generate(name=str(save.filename)+'test_boring.wav')
-        generate(name=str(save.filename)+'test_interesting.wav', lame=False)
+        saveParams(lstm.params, 'rundata/' + model_name)
+        generate(name='rundata/' + str(save.filename)+'test_boring.wav')
+        generate(
+                name='rundata/' + str(save.filename)+'test_interesting.wav',
+                lame=False)
         save.filename += 1
         return
 
     save.filename = 0
 
     def load():
-        loadParams(lstm.params, model_name + '.npz')
+        loadParams(lstm.params, 'rundata/' + model_name + '.npz')
         return
 
     def generate(lame=True, name='test.wav'):
@@ -443,7 +444,7 @@ def trainGRU():
             generateMusicFile(FT_to_wav(scaleBack(song, scale, type='gauss'),
                 channels=CHANNELS) , name, channels=1)
         else:
-            length = 2500
+            length = 1000
             song = np.zeros((length, INPUT_SIZE)).astype('float32')
             song[:1] = X_dat[:1]
             for i in range(1, length):
@@ -458,18 +459,29 @@ def trainGRU():
         load()
     except:
         print("Failed to load previous model")
-    print("Saving")
-    save()
 
     print("Compiling learn function")
     learn = theano.function([lstm.x, y_], error, updates=upd,
             allow_input_downcast=True)
     print("Commencing learning")
-    train_error = miniRecurrentLearning(X_dat, Y_dat, 20, learn, predict, reset,
-            verbose=True, epochs=10, save=save, saveiters=300, strides=1,
-            f=error_file)
+    train_error = []
+    for d in data_generator(scale=scale):
+        train_error += miniRecurrentLearning(d[:-1], d[1:], 50, learn, predict,
+                reset,
+                verbose=True, epochs=1, save=save, saveiters=300, strides=50,
+                f=error_file)
+        save()
 
     pickle.dump(train_error, open('lstm_train.data', 'wb'))
+
+def data_generator(chunk_size=2048, scale=None):
+    s, d = get_data(0, channels='mono', scale=scale, chunk_size=chunk_size)
+    yield d
+    i = 1
+    while True:
+        _, d = get_data(i, channels='mono', scale=s, chunk_size=chunk_size)
+        yield d
+        i += 1
 
 def EEDataGenerator():
     #Build models
@@ -622,4 +634,4 @@ def EEDataGenerator():
         test_model(x, y, o, params, predict, reset, str(i+1) + 'LayerCWRNN')
 
 if __name__ == '__main__':
-    EEDataGenerator()
+    trainGRU()

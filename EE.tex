@@ -74,7 +74,9 @@ being whether or not the event, such as cancer, did or did not happen based on
 the data~\cite{ngrepr}.
 
 These models, however, have limitations as to how complex the data in which they
-can model.
+can model. For example, as they are classification models, they are not very
+applicable for the task of music generation, which requires predicting integer
+values, as opposed to true or false labels.
 
 \subsection{Neural Networks}
 To understand the other models, one must first understand what a neural network
@@ -90,34 +92,29 @@ biological systems, since the outputs of each classifier can be thought of as
 activations for synapses in a brain~\cite{nielbook}. Because neural network
 models have more weights and layers than logistic regression classifiers,
 intuitively it seems that neural networks are more powerful in what types of
-data they can represent.
+data they can represent. Thus, as music is complex, a more powerful model should
+be used.
 
 
 \subsection{Deep Learning}
 Deep learning in this paper will be interpreted as is interpreted in LeCun et
 al.'s presentation: any model with ``multiple levels of
-abstraction''~\cite{dlppt}.  Some neural networks only have 2 through 4 layers,
-where each layer is essentially a logistic regression classifier.  However, as
-mentioned in Nielsen's book about machine learning, increasing the number of
-layers to numbers such as 10 presents considerable challenges, as it not only
-takes much longer to compute gradients for the weights of the network, but the
-gradients also have a tendency to be too small or too large, resulting in
-inefficient training~\cite{nielgrad}. This problem will be addressed through
-using gradient descent algorithms that are designed to avoid this problem.
+abstraction''~\cite{dlppt}.
 
-Deep learning algorithms however, are capable of complex tasks , potentially due
-to their increased size. For example, one applications of these deep networks is
+Deep learning algorithms are capable of complex tasks, potentially due to their
+increased size. For example, one applications of these deep networks is
 SyntaxNet, an algorithm that can correctly determine the grammatical structure
 of a sentence, such as determining what the direct object of a sentence
 is~\cite{syntaxnet}. Because of these successes with deep architectures, they
-will be tested to see if they are powerful enough to generate music.
+will be tested to see if they are powerful enough to generate music, as they are
+very powerful in other areas.
 
 
 \subsection{Vanilla Recurrent Neural Networks}
 According to Orr's class website at Willamette University, recurrent networks
 are a variation of neural networks that can model time series data, which is as
 a result, can be used in natural language processing tasks~\cite{rnnintro}. As
-Orr elabroates, vanilla recurrent neural networks accomplish this task through
+Orr elaborates, vanilla recurrent neural networks accomplish this task through
 being a neural network, except with some connections going through
 time~\cite{rnnintro}. In this paper, the activation of a hidden node can be considered as
 $$a_t = W\cdot a_{t-1} + W\cdot I_t + b_a$$
@@ -128,7 +125,7 @@ sigmoid function before being passed to the next node~\cite{rnnintro}. These
 models theoretically can model time series, and some examples given by Orr's
 class are speech recognition and learning the grammar of languages, but in
 practice they do not have much memory, as compared to other models, such as
-LSTM's~\cite{rnnintro}\cite{lstm}.  As the length of the time series increases,
+LSTM's~\cite{rnnintro}\cite{lstm}. As the length of the time series increases,
 these models become prone to ``forgetting'' earlier samples in the input data,
 as demonstrated by Horchreiter 's paper, as recurrent nets were outperformed on
 tasks requiring long term memory by LSTM's~\cite{lstm}. Thus, other more
@@ -140,9 +137,10 @@ intuitively, music seems to have long term dependencies.
 A model that, developed by researches in the Technical Institute of Berlin,
 attempts to overcome the short term memory of vanilla neural networks and solve
 the vanishing gradient problem is the long short term memory
-network~\cite{lstm}. As described in Horchreiter's paper, these networks, through using cells and vectors that can be
-modified by the network, can store long term information~\cite{lstm}. They do this through
-generating ``memories'', through the function:
+network~\cite{lstm}. As described in Horchreiter's paper, these networks,
+through using cells and vectors that can be modified by the network, can store
+long term information~\cite{lstm}. They do this through generating ``memories'',
+through the function:
 $$M = \tanh(W\cdot C + W\cdot I_t + b_M)$$
 where C denotes the cell state of the network, as originally envisioned by
 Horchreiter~\cite{lstm}. However, these networks are more computationally
@@ -279,13 +277,14 @@ these problems with gradient propagation are remedied, and networks
 theoretically train more quickly~\cite{xavier}
 
 \subsection{Rprop Trainer}
-A training method that was considered was RPROP, originally devised by
+The initial training method that was considered was RPROP, originally devised by
 Reidmiller and Braun~\cite{rprop}. This training method utilizes only the sign
 of the gradient, and has a stored matrix representing the magnitude in which the
 algorithm will update the parameters~\cite{rprop}. The reason this method will
 be considered is because this algorithm is not affected by the vanishing
 gradient problem, or the exploding gradient problem, as the algorithm is only
-dependent on the sign of the gradient, being positive or negative~\cite{rprop}.
+dependent on the sign of the gradient, not the magnitude of the gradient, which
+may be unreasonably large or small~\cite{rprop}.
 Furthermore, the algorithm approaches the minimum for the error function
 exponentially, as it will increase the magnitude of the update if the previous
 update was in the same direction as the current update. For example, if the
@@ -367,7 +366,7 @@ along with different dimensionality reducing steps.
 
 \section{Implementational Details}
 Python and Theano are used to test these models. Python is a programming
-language, and Theano is a library for python~\cite{theano}. Theano is considered to be very
+language, and Theano is a library for python~\cite{theano}. Theano is considered to be
 fast amongst the machine learning community, which is why it is used. Also, a
 gpu will be utilized to increase the performance of all models. The music
 utilized for the model will have come from Youtube. Also, as it was found that
@@ -398,7 +397,7 @@ computationally expensive algorithm available. The networks were trained for 5
 epochs on the data, with a sequence of length 200 samples of size 2048 being fed
 into the network each time. The data was iterated over by 5 samples at a time.
 
-The networks were then trained on the data with a GTX 960M, to speed up
+The networks were then trained on the data with a GTX 960M, a GPU, to speed up
 training. Also the reason why only 5 epochs were used was also to save time, as
 a large variation of models were being tested.
 
@@ -448,15 +447,9 @@ graph depicting the error rates of the 3 layered models is clearer.
 After considering figure~\ref{fig:3layer}, it becomes obvious that the model
 requiring the least iterations to converge the quickest to a low error rate is
 the 3 layer GRU, followed by the 3 layer clockwork recurrent network. The LSTM
-error rate is significantly higher than the rest of the models, suggesting that
+error rate is significantly higher than the rest of the models, considering the
+LSTM had comparable performance on the first graph, suggesting that
 perhaps the model was implemented incorrectly.
-
-%The restricted Boltzmann machine and autoencoder did not decrease their
-%reconstruction error to a significant amount, and did not even overfit the data
-%when they had more hidden units than the visible units, which suggests that they
-%were implemented poorly or that they take a significant amount of time to train.
-%Nonetheless, because of their significantly poor results, they were not utilized
-%in this paper, and thus, do not have any benchmarks.
 
 \section{Observations}
 Although the clockwork recurrent neural network was thought to be faster, it
@@ -484,7 +477,7 @@ vanilla recurrent network is the best network for training to generate music.
 
 \section{Appendix}
 As the code is extremely lengthy, it is stored separately. To view the code,
-refer to online repository at: \url{https://github.com/Peachball/EE-DeepLearning}.
+refer to the online repository at: \url{https://github.com/Peachball/EE-DeepLearning}.
 
 \begin{thebibliography}{9}
 	\bibitem{rbm}
