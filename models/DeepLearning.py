@@ -324,7 +324,7 @@ def generateNesterovMomentumUpdates(params, error, alpha=0.01, momentum=0.9,
         decay=1e-6):
     print("WARNING: NOT FULLY IMPLEMENTED YET")
     updates = []
-    momentum = []
+    m = []
     for p in params:
         v_t = theano.shared(np.zeros(p.get_value().shape)
                 .astype(theano.config.floatX))
@@ -333,9 +333,9 @@ def generateNesterovMomentumUpdates(params, error, alpha=0.01, momentum=0.9,
         updates.append((p, p + v_t))
         updates.append((v_t, momentum * v_t - alpha * grad))
 
-        momentum.append(v_t)
+        m.append(v_t)
 
-    return (momentum, updates)
+    return (m, updates)
 
 def generateRpropUpdates(params, error, init_size=1, verbose=False):
     prevw = []

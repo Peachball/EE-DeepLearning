@@ -392,6 +392,63 @@ def testKerasLSTM():
             print("Iteration: {0:.4f} Error: {1}".format(i+1, e))
         model.save_weights("keras_musicgen.h5", overwrite=True)
 
+def testtfLSTM():
+    import tensorflow as tf
+    X = tf.placeholder(tf.float32, [1, 2, 2048], name='input')
+    Y = tf.placeholder(tf.float32, [1, 2, 2048], name='label')
+
+    with tf.variable_scope("LSTM") as scope:
+        lstm = tf.nn.rnn_cell.LSTMCell(2048, use_peepholes=True)
+        stacked = tf.nn.rnn_cell.MultiRNNCell([lstm] * 4)
+        init_state = stacked.zero_state(1, tf.float32)
+
+    def add_transformation(inp, out_size, name):
+        shape = [int(s) for s in inp.get_shape()]
+        with tf.variable_scope(name) as scope:
+            w = tf.get_variable('w', shape=[inp.get_shape()[-1], out_size],
+                    initializer=tf.contrib.layers.xavier_initializer())
+            b = tf.get_variable('b', shape=[out_size])
+            scope.reuse_variables()
+        if len(inp.get_shape()) == 2:
+            return tf.matmul(inp, w) + b
+        else:
+            downcast = tf.reshape(inp, (-1, int(inp.get_shape()[2])))
+            mult = tf.matmul(downcast, w) + b
+
+            return tf.reshape(tf.matmul(downcast, w) + b, (inp.get_shape()))
+
+    num_steps = 2
+    outputs, final_state = tf.nn.dynamic_rnn(stacked, inputs=X,
+            initial_state=init_state)
+    tf.histogram_summary('state', final_state)
+    tf.histogram_summary('outputs', outputs)
+    gen = add_transformation(outputs, 2048, 'out_transform')
+
+    loss = tf.reduce_mean(tf.reduce_sum(tf.squared_difference(Y, gen), 2))
+    tf.scalar_summary('loss', loss)
+
+    train_step = tf.train.RMSPropOptimizer(0.01).minimize(loss)
+    merged = tf.merge_all_summaries()
+    sw = tf.train.SummaryWriter('tflogs/musicgen')
+
+    init = tf.initialize_all_variables()
+    saver = tf.train.Saver()
+
+    with tf.Session() as sess:
+        sess.run(init)
+        for d in data_generator():
+            s = sess.run(init_state)
+            for i in range(num_steps, d.shape[0], num_steps):
+                x = d[None,i-num_steps:i,:]
+                y = d[None,i:i+num_steps,:]
+                _, s, e, summaries = sess.run(
+                        [train_step, final_state, loss, merged],
+                        feed_dict={X: x, Y: y, init_state: s})
+                saver.save(sess, 'tflogs/musicgen/model.cpkt')
+                sw.add_summary(summaries)
+                print(e)
+
+
 def get_data(index, channels='reg', chunk_size=1024, scale=None):
     od = convertMusicFile(index)
     od = od.astype('float32')
@@ -634,4 +691,4 @@ def EEDataGenerator():
         test_model(x, y, o, params, predict, reset, str(i+1) + 'LayerCWRNN')
 
 if __name__ == '__main__':
-    trainGRU()
+    testtfLSTM()

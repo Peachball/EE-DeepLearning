@@ -3,10 +3,10 @@ import theano.tensor as T
 import theano
 from keras.models import Sequential
 import numpy as np
-from DeepLearning import init_weights
+from models.DeepLearning import init_weights
 import math
 import matplotlib.pyplot as plt
-from DeepLearning import *
+# from DeepLearning import *
 
 
 def get_data():
@@ -445,6 +445,7 @@ def keras_control_test():
                 metrics=['accuracy'])
 
     (X_dat, Y_dat), (X_val, Y_val) = get_data()
+    print(X_dat.shape)
 
     try:
         model.load_weights('6layertest.h5')

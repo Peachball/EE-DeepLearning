@@ -62,8 +62,12 @@ def add_conv_layer(inp, shape, subsample, name, weights, layers, act_type='relu'
         act = T.nnet.relu(conv + b.dimshuffle('x', 0, 'x', 'x'))
     if act_type == 'sigmoid':
         act = T.nnet.sigmoid(conv + b.dimshuffle('x', 0, 'x', 'x'))
-    layers[name] = conv
-    layers[name + '_act'] = act
+    if act_type == 'linear':
+        act = conv + b.dimshuffle('x', 0, 'x', 'x')
+    if act_type == 'softplus':
+        act = T.nnet.softplus(conv + b.dimshuffle('x', 0, 'x', 'x'))
+    # layers[name] = conv
+    # layers[name + '_act'] = act
 
     weights[name + '_w'] = w
     weights[name + '_b'] = b
@@ -95,24 +99,24 @@ def add_upsample(inp, shape):
     return o
 
 def construct_model(inp, weights, layers):
-    output = add_conv_layer(inp, (64, 3, 3, 3), (1, 1), 'conv1', weights, layers)
+    output = add_conv_layer(inp, (16, 3, 3, 3), (1, 1), 'conv1', weights, layers)
     output = add_pooling(output, (2, 2))
-    output = add_conv_layer(output, (128, 64, 3, 3), (1, 1), 'conv2', weights,
+    output = add_conv_layer(output, (64, 16, 3, 3), (1, 1), 'conv2', weights,
             layers)
     output = add_pooling(output, (2, 2))
-    output = add_conv_layer(output, (128, 128, 3, 3), (1, 1), 'conv3', weights,
+    output = add_conv_layer(output, (128, 64, 3, 3), (1, 1), 'conv3', weights,
             layers)
     output = add_pooling(output, (2, 2))
     output = add_conv_layer(output, (128, 128, 3, 3), (1, 1), 'conv4', weights,
             layers)
     output = add_pooling(output, (2, 2))
-    output = add_conv_layer(output, (64, 128, 3, 3), (1, 1), 'conv5', weights,
+    output = add_conv_layer(output, (128, 128, 3, 3), (1, 1), 'conv5', weights,
             layers)
     output = add_pooling(output, (2, 2))
-    output = add_conv_layer(output, (32, 64, 3, 3), (1, 1), 'conv6', weights,
+    output = add_conv_layer(output, (128, 128, 3, 3), (1, 1), 'conv6', weights,
             layers)
     output = add_pooling(output, (2, 2))
-    output = add_conv_layer(output, (16, 32, 3, 3), (1, 1), 'conv7', weights,
+    output = add_conv_layer(output, (16, 128, 3, 3), (1, 1), 'conv7', weights,
             layers)
     output = add_pooling(output, (2, 2))
     output = T.flatten(output, outdim=2)
@@ -151,7 +155,6 @@ def hehexd():
     def display(image):
         print(image.shape)
         plt.imshow(image.transpose(1, 2, 0))
-    x = load_images(tuple([0, 32]))
     X = T.tensor4(name='Images')
     Y = T.matrix(name='output label')
     Z_ = T.matrix(name='seed')
@@ -194,26 +197,106 @@ def hehexd():
         print("Unable to load previous params")
         print(e)
     # saveH5(all_param_map, savefile)
-    image_num = 9
-    gen_num = 1
+    image_num = 3
+    gen_num = 3
     cor = np.ones((image_num + gen_num, 1)).astype(theano.config.floatX)
     cor[image_num:] = 0
     iteration = 0
-    currange = [0, 32]
-    while True:
-        index = iteration - currange[0]
-        error = learn(x[index:index+image_num], np.random.rand(gen_num, 100), cor)
+    plt.ion()
+    for d in data_gen(image_num):
+        error = learn(d, np.random.rand(gen_num, 100), cor)
         print(error)
         err.write(str(error) + '\n')
         err.flush()
-        iteration += image_num
-        if iteration + image_num >= currange[1]:
-            currange[0] = currange[1]
-            currange[1] = currange[0] + max(50, image_num)
-            x = load_images(tuple(currange))
-            print("Loading more files")
+        iteration += 1
+
+        sample_z = np.random.rand(1, 100)
+        g = generate(sample_z)[0]
+        plt.subplot(121)
+        plt.imshow(g.transpose(1, 2, 0))
+        plt.subplot(122)
+        plt.imshow(d[0].transpose(1, 2, 0))
+        plt.pause(0.05)
+
         if iteration % 100 == 0:
             saveH5(all_param_map, savefile)
+
+def construct_encoder(inp, param, latent_size=8):
+    mu = add_conv_layer(
+            inp,
+            (8, 3, 3, 3),
+            (1, 1),
+            'conv1',
+            param,
+            None,
+            act_type='linear')
+
+    log_var = add_conv_layer(
+            inp,
+            (8, 3, 3, 3),
+            (1, 1),
+            'conv1/var',
+            param,
+            None,
+            act_type='linear')
+
+    return mu, log_var
+
+def construct_decoder(inp, param):
+    output = add_conv_layer(inp, (3, 8, 3, 3), (1, 1), 'deconv1', param, None,
+            act_type='linear')
+    return output
+
+def VAE():
+    X = T.tensor4('image')
+    Z = T.tensor4('latent sampled')
+
+    enc_param = {}
+    dec_param = {}
+
+    z_mean, z_log_var = construct_encoder(X, enc_param)
+    rng = T.shared_randomstreams.RandomStreams()
+    sampled = rng.normal(z_mean.shape) * T.exp(z_log_var / 2) + z_mean
+
+    reconstructed = construct_decoder(sampled, dec_param)
+    custom_reconstruct = construct_decoder(Z, dec_param)
+
+    kl_divergence = - 0.5 * T.mean(
+            1 + z_log_var - T.sqr(z_mean) - T.exp(z_log_var))
+
+    error = T.mean(T.sqr(X - reconstructed)) + 0.1 * kl_divergence
+
+    all_param = {}
+    all_param.update(enc_param)
+    all_param.update(dec_param)
+
+    params = list(all_param.values())
+    alpha = theano.shared(np.array(0.1).astype(theano.config.floatX))
+    upd = generateVanillaUpdates(params, error, alpha=alpha)
+
+    learn = theano.function([X], error, updates=upd, allow_input_downcast=True)
+    generate = theano.function([X], reconstructed, allow_input_downcast=True)
+    gen_sample = theano.function([Z],
+            custom_reconstruct,
+            allow_input_downcast=True)
+
+    plt.ion()
+    ema = 10
+    prev_err = ema
+    i = 0
+    for d in data_gen(9):
+        e = learn(d)
+        ema = (0.99) * ema + 0.01 * e
+        print(e)
+        g = generate(d[:1])[0]
+        plt.imshow(g.transpose(1, 2, 0))
+        plt.pause(0.05)
+        i += 1
+        if i % 20 == 0:
+            if ema > prev_err:
+                alpha.set_value(alpha.get_value() / 2.0)
+                print("Decreasing alpha")
+            prev_err = ema
 
 def keras_DCGAN():
     LATENT_DIM = 32
@@ -266,4 +349,4 @@ def keras_DCGAN():
         pass
 
 if __name__ == '__main__':
-    hehexd()
+    VAE()

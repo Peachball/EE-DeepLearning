@@ -19,3 +19,4 @@ EE*
 datasets/
 rundata/
 trained_models/
+/tflogs
