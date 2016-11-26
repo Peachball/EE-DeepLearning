@@ -7,7 +7,7 @@
 \usepackage{geometry}
 \usepackage[T1]{fontenc}
 \usepackage[american]{babel}
-\usepackage{csquotes}
+%\usepackage{csquotes}
 \usepackage{hyperref}
 \usepackage{setspace}
 \usepackage{verbatim}
@@ -17,9 +17,9 @@
 
 \begin{document}
 \doublespacing
-\author{Chen Xu}
-\title{Effectiveness of Various Deep Learning Algorithms on Music Generation}
-\maketitle
+%\author{Chen Xu}
+%%\title{Effectiveness of Various Recurrent Network Architectures on Music Generation}
+%\maketitle
 
 \section{Introduction}
 As technology develops, more and more computationally expensive tasks can be
@@ -96,18 +96,18 @@ data they can represent. Thus, as music is complex, a more powerful model should
 be used.
 
 
-\subsection{Deep Learning}
-Deep learning in this paper will be interpreted as is interpreted in LeCun et
-al.'s presentation: any model with ``multiple levels of
-abstraction''~\cite{dlppt}.
+%\subsection{Deep Learning}
+%Deep learning in this paper will be interpreted as is interpreted in LeCun et
+%al.'s presentation: any model with ``multiple levels of
+%abstraction''~\cite{dlppt}.
 
-Deep learning algorithms are capable of complex tasks, potentially due to their
-increased size. For example, one applications of these deep networks is
-SyntaxNet, an algorithm that can correctly determine the grammatical structure
-of a sentence, such as determining what the direct object of a sentence
-is~\cite{syntaxnet}. Because of these successes with deep architectures, they
-will be tested to see if they are powerful enough to generate music, as they are
-very powerful in other areas.
+%Deep learning algorithms are capable of complex tasks, potentially due to their
+%increased size. For example, one applications of these deep networks is
+%SyntaxNet, an algorithm that can correctly determine the grammatical structure
+%of a sentence, such as determining what the direct object of a sentence
+%is~\cite{syntaxnet}. Because of these successes with deep architectures, they
+%will be tested to see if they are powerful enough to generate music, as they are
+%very powerful in other areas.
 
 
 \subsection{Vanilla Recurrent Neural Networks}
@@ -265,16 +265,16 @@ Because of the aforementioned gradient problems, normal methods of minimizing
 the error of these models are extremely slow. Thus, new techniques will be
 investigated, although they will not all be tested.
 
-\subsection{Xavier Initialization}
-One method to alleviate the vanishing gradient problem is better weight
-initialization. As Glorot and Bengio found, the initialization of the weights
-affects the propagation of the gradient through the model~\cite{xavier}.
-Generally, poor initialization of neural networks in general causes the gradient
-to not be propagated as well through the network, and since the network is
-trained based on the gradients, the network will have slower convergence times
-with poor initialization~\cite{xavier}. However, with xavier initialization,
-these problems with gradient propagation are remedied, and networks
-theoretically train more quickly~\cite{xavier}
+%\subsection{Xavier Initialization}
+%One method to alleviate the vanishing gradient problem is better weight
+%initialization. As Glorot and Bengio found, the initialization of the weights
+%affects the propagation of the gradient through the model~\cite{xavier}.
+%Generally, poor initialization of neural networks in general causes the gradient
+%to not be propagated as well through the network, and since the network is
+%trained based on the gradients, the network will have slower convergence times
+%with poor initialization~\cite{xavier}. However, with xavier initialization,
+%these problems with gradient propagation are remedied, and networks
+%theoretically train more quickly~\cite{xavier}
 
 \subsection{Rprop Trainer}
 The initial training method that was considered was RPROP, originally devised by
@@ -360,21 +360,22 @@ due to the gradient not being calculated with respect to all data samples.
 
 \section{Comparison}
 Thus, this paper will compare the effectiveness of the various models, being
-LSTMs, Vanilla Recurrent Networks, and Clockwork Recurrent Neural Networks,
-along with different dimensionality reducing steps.
+LSTMs, Vanilla Recurrent Networks, and Clockwork Recurrent Neural Networks. The
+error rates of each model, and the time they take to train on 5 epochs of the
+training song will be used to judge their effectiveness of music generation.
 
 
 \section{Implementational Details}
 Python and Theano are used to test these models. Python is a programming
-language, and Theano is a library for python~\cite{theano}. Theano is considered to be
-fast amongst the machine learning community, which is why it is used. Also, a
-gpu will be utilized to increase the performance of all models. The music
-utilized for the model will have come from Youtube. Also, as it was found that
-generally electronic music yielded better results, electronic Youtube music is
-used for aesthetic purposes, and to get better errors to compare. Furthermore,
-to aid the model, the music will be put through a Fourier transform before
-having the model learn it. This is purely to produce nicer results, as when
-testing without the Fourier transform, the model took longer to train and
+language, and Theano is a library for python~\cite{theano}. Theano is considered
+to be fast amongst the machine learning community, which is why it is used.
+Also, a gpu will be utilized to increase the performance of all models. The
+music utilized for the model will have come from Youtube. Also, as it was found
+that generally electronic music yielded better results, electronic Youtube music
+is used for aesthetic purposes, and to get better errors to compare.
+Furthermore, to aid the model, the music will be put through a Fourier transform
+before having the model learn it. This is purely to produce nicer results, as
+when testing without the Fourier transform, the model took longer to train and
 produced more static, as opposed to the model trained on the Fourier transform.
 
 The comparisons will be done with networks all having cell sizes, or memory
@@ -465,6 +466,14 @@ does not have as much modeling power as a simple vanilla recurrent network,
 which is difficult to believe, simply due to how much more complex the LSTM
 model is compared to the original recurrent network.
 
+However, it should be noted that in these experiments, because of limits on
+computational power and limits on time, the recurrent nets tested were fairly
+small, so they did not generate anything that could be determined as music.
+However, I went back and using these results, trained a larger, 4 layer GRU, and
+was able to generate some audio that had a resemblence to some musical structure
+within it, but it was essentially a direct copy of a section of the song that it
+trained on.
+
 \section{Conclusion}
 Based on the benchmarks taken, it seems that in terms of speed, the vanilla
 recurrent network is the fastest recurrent network for music generations.
@@ -474,6 +483,21 @@ on the data in this experiment. However, as the error rates between all the
 networks seemed similar, perhaps the most important factor in the training of a
 recurrent network for music generation is speed, suggesting that perhaps the
 vanilla recurrent network is the best network for training to generate music.
+
+Some implications of these experiments are that in order for recurrent networks
+to progress, the current method of training them must either be improved, or
+a new architecture needs to be developed, since the nets did not decrease their
+error rate to a low enough degress such that music could be heard, as my results
+demonstrated. Thus, it seems that recurrent nets are still a ways away from the
+task of music generation.
+
+Furthermore, because the recurrent nets in this experiment were unable to
+generate music, their ability to generate other sequences seem questionable as
+well. Machine learning algorithms and technology may still need another couple
+of years to develop before the idea of audio generation tasks in general become
+possible, as music can be compared to other forms of audio as well, and perhaps
+the primary algorithm for such audio generation will not be simple recurrent
+nets, due to their difficulty to train and generate interesting sequences.
 
 \section{Appendix}
 As the code is extremely lengthy, it is stored separately. To view the code,
