@@ -1,3 +1,4 @@
+from __future__ import print_function
 import pickle
 import theano
 from models.DeepLearning import *
@@ -13,24 +14,24 @@ from os.path import join
 
 SAMPLE_RATE = 44100
 
-def downloadMusicPlayList(outdir, playlist_url, num=50):
+def downloadMusicPlaylist(outdir, playlist_url, num=50):
     import youtube_dl
-    for i in range(num):
-        ydl_opts = {'format': 'bestaudio/best',
-                    'postprocessors': [{
-                            'key': 'FFmpegExtractAudio',
-                            'preferredcodec': 'wav',
-                        }],
-                    'outtmpl' : outdir + '%(playlist_index)s.$(ext)s',
-                    'playlist_items': num
-                    }
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([playlist_url])
+    # for i in range(num):
+    ydl_opts = {'format': 'bestaudio/best',
+                'postprocessors': [{
+                        'key': 'FFmpegExtractAudio',
+                        'preferredcodec': 'wav',
+                    }],
+                'outtmpl' : outdir + '%(playlist_index)s.$(ext)s',
+                'playlist_items': num
+                }
+    with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([playlist_url])
 
 def convertMusicFile(index, inputsize=1000):
-    INDEX_NUM = 49
+    INDEX_NUM = 268
     index = index % INDEX_NUM
-    filename = join('datasets','musicDataSet', "{0:0=3d}".format(index) + '.wav')
+    filename = join('datasets','ncs', "{0:0=3d}".format(index) + '.wav')
     samplerate, data = wavUtil.read(filename)
 
     #Get rid of quiet parts in the beginning and end
@@ -532,13 +533,23 @@ def trainGRU():
     pickle.dump(train_error, open('lstm_train.data', 'wb'))
 
 def data_generator(chunk_size=2048, scale=None):
-    s, d = get_data(0, channels='mono', scale=scale, chunk_size=chunk_size)
+    i = 0
+    try:
+        with open('rundata/train.meta', 'r') as f:
+            i = int(f.read())
+    except:
+        print("Failed to load previous file location")
+
+    s, d = get_data(i, channels='mono', scale=scale, chunk_size=chunk_size)
     yield d
     i = 1
     while True:
         _, d = get_data(i, channels='mono', scale=s, chunk_size=chunk_size)
         yield d
         i += 1
+
+        with open('rundata/train.meta', 'w') as f:
+            f.write(i)
 
 def EEDataGenerator():
     #Build models
@@ -691,4 +702,4 @@ def EEDataGenerator():
         test_model(x, y, o, params, predict, reset, str(i+1) + 'LayerCWRNN')
 
 if __name__ == '__main__':
-    testtfLSTM()
+    trainGRU()
