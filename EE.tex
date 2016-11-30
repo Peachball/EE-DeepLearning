@@ -28,12 +28,13 @@
 % Headers
 \renewcommand{\headrulewidth}{0pt}
 \renewcommand{\footrulewidth}{0pt}
-\fancyhead[R]{Xu \thepage}
+\fancyhead[R]{fwj493 \thepage}
 \fancyhead[L]{}
 \cfoot{} % Clear bottom page number
 \pagestyle{fancy}
 
 \noindent
+\thispagestyle{empty}
 \textbf{\Large Effectiveness of Various Recurrent Architectures on Music
 Generation}
 
@@ -515,106 +516,131 @@ possible, as music can be compared to other forms of audio as well, and perhaps
 the primary algorithm for such audio generation will not be simple recurrent
 nets, due to their difficulty to train and generate interesting sequences.
 
+\newpage
 \section{Appendix}
 As the code is extremely lengthy, it is stored separately. To view the code,
 refer to the online repository at: \url{https://github.com/Peachball/EE-DeepLearning}.
 
+\newpage
 \begin{thebibliography}{9}
 	\bibitem{theano}
 		Bengio, Yoshua et al. \textit{Theano: A Python framework for fast
-		computation of mathematical expressions.}. Web.
+		computation of mathematical expressions.}.
+		\url{http://deeplearning.net/software/theano}. Accessed 30 Aug. 2016.
 
 	\bibitem{widendeep}
 		Cheng, Heng-Tze. ``Wide and Deep Learning: Better Together with
-		Tensorflow.'' \textit{Google Research Blog}, 29 June 2016. Web. 29 Aug.
-		2016
+		Tensorflow.'' \textit{Google Research Blog}, 29 June 2016.
+		\url{https://research.googleblog.com/2016/06/wide-deep-learning-better-together-with.html}.
+		Accessed 29 Aug. 2016
 
 	\bibitem{gru}
 		Chung, Gulcehre, Cho, and Bengio. ``Empirical Evaluation of Gated
-		Recurrent Models on Sequence Modeling.'' \textit{arXiv} Web. 20 Aug.
-		2016.
+		Recurrent Models on Sequence Modeling.'' \textit{arXiv}
+		\url{https://arxiv.org/pdf/1412.3555v1.pdf}. Accessed 20 Aug. 2016.
 
 	\bibitem{forgetgate}
 		Gers, Schmidhuber, and Cummings. ``Learning to Forget: Continual
-		Prediction with LSTM." \textit{ISDIA}, 1999 pag. 1-19. Web. 30 Aug.
-		2016.
+		Prediction with LSTM." \textit{ISDIA}, 1999 pag. 1-19.
+		\url{https://pdfs.semanticscholar.org/1154/0131eae85b2e11d53df7f1360eeb6476e7f4.pdf}.
+		Accessed 30 Aug. 2016.
 
 	\bibitem{lstmpeep}
 		Gers, Schraudolph, and Schmidhuber. ``Learning Precise Timing with LSTM
 		Recurrent Networks.'' \textit{Journal of Machine Learning Research},
-		2002, pag. 115-143. Web. 3 Sept. 2016.
+		2002, pag. 115-143.
+		\url{http://www.jmlr.org/papers/volume3/gers02a/gers02a.pdf}. Accessed 3
+		Sept. 2016.
 
 	\bibitem{xavier}
 		Glorot, Xavier and Bengio, Yoshua. ``Understanding the difficulty of
 		training deep feedforward neural networks.'' \textit{Journal of Machine
-		Learning Research}, Vol 9, 2010, pag. 249-256. Web. 30 Aug. 2016.
+		Learning Research}, Vol 9, 2010, pag. 249-256.
+		\url{http://jmlr.org/proceedings/papers/v9/glorot10a/glorot10a.pdf}.
+		Accessed 30 Aug. 2016.
 
 	\bibitem{rmsprop}
 		Hinton, Geoffrey. ``Neural Networks for Machine Learning.'' University
-		of Toronto. Web. 29 Aug. 2016.
+		of Toronto.
+		\url{http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf}.
+		Accessed 29 Aug. 2016.
 
 	\bibitem{lstm}
 		Horchreiter, Sepp and Schmidhuber, Jurgen. ``Long Short-Term Memory.''
-		\textit{Technical University of Munich (1997)}: 1--32. Web. 10 May 2016.
+		\textit{Technical University of Munich (1997)}: 1--32.
+		\url{http://deeplearning.cs.cmu.edu/pdfs/Hochreiter97_lstm.pdf}.
+		Accessed 10 May 2016.
 
 	\bibitem{matplotlib}
 		Hunter, J.D. ``Matplotlib: A 2D graphics environment.''
 		\textit{Computing in Science \& Engineering}, vol 9, no. 3, 2007, pag.
-		90-95. Web. 9 Oct.  2016.
+		90-95. \url{http://matplotlib.org/}. Accessed 9 Oct.  2016.
 
 	\bibitem{rnntrain}
 		Jaeger, Herbert. ``A Tutorial on training recurrent neural networks,
-		covering BPTT, RTRL, EKF, and the ``echo state network''
-		approach.'' \textit{German National Research Center for Information
-		Technology}, 2013. Web. 10 Sept. 2016.
+		covering BPTT, RTRL, EKF, and the ``echo state network'' approach.''
+		\textit{German National Research Center for Information Technology},
+		2013.
+		\url{http://minds.jacobs-university.de/sites/default/files/uploads/papers/ESNTutorialRev.pdf}.
+		Accessed 10 Sept. 2016.
 
 	\bibitem{lstmbias}
 		Jozefowicz, Zaremba, and Sutskever. ``An Empirical Exploration of Neural
-		Network Architectures.'' \textit{JMLR}, vol 37. Web. 4 Sept. 2016.
+		Network Architectures.'' \textit{JMLR}, vol 37.
+		\url{http://jmlr.org/proceedings/papers/v37/jozefowicz15.pdf}. Accessed
+		4 Sept. 2016.
 
 	\bibitem{cw-rnn}
 		Koutnik, Jan et al. ``A Clockwork RNN.'' \textit{Dalle Molle Institute
-		for Artificial Intelligence Research}: n\. pag. Web. 25 May 2016.
+		for Artificial Intelligence Research}: n\. pag.
+		\url{https://arxiv.org/pdf/1402.3511.pdf}. Accessed 25 May 2016.
 
 	\bibitem{dlppt}
 		LeCun, Yann, Yoshua Bengio, and Geoffrey Hinton. "Deep learning." Nature
-		521.7553 (2015): 436-444. Web. 9 Oct. 2016
+		521.7553 (2015): 436-444.
+		\url{http://www.bioinfo.org.cn/~casp/temp/DeepLearning.pdf}. Accessed 9 Oct. 2016
 
 	\bibitem{nielbook}
 		Nielsen, Michael. ``Chapter 1: Using neural nets to recognize
 		handwritten digits.'' \textit{Neural Networks and Deep Learning},
-		\url{neuralnetworksanddeeplearning.com/chap1.html}. Web. 10 Sept. 2016.
+		\url{neuralnetworksanddeeplearning.com/chap1.html}. Accessed 10 Sept. 2016.
 
 	\bibitem{nielgrad}
 		Nielsen, Michael. ``Chapter 5: Why are deep neural networks so hard to
 		train?'' \textit{Neural Networks and Deep Learning},
-		\url{neuralnetworksanddeeplearning.com/chap5.html}. Web. 10 Sept. 2016.
+		\url{neuralnetworksanddeeplearning.com/chap5.html}. Accessed 10 Sept. 2016.
 
 	\bibitem{ngcourse}
 		Ng, Andrew. ``Classification.'' \textit{Machine Learning}, Coursera.
-		Web. 6 Jul. 2016.
+		\url{https://www.coursera.org/learn/machine-learning/lecture/wlPeP/classification}.
+		Accessed 6 Jul. 2016.
 
 	\bibitem{ngrepr}
 		Ng, Andrew. ``Hypothesis Representation.'' \textit{Machine Learning}, Coursera.
-		Web. 6 Jul. 2016.
+		\url{https://www.coursera.org/learn/machine-learning/lecture/RJXfB/hypothesis-representation}.
+		Accessed 6 Jul. 2016.
 
 	\bibitem{wavenet}
 		Oord, Aaron van den, et al. "WaveNet: A Generative Model for Raw Audio."
+		\url{https://deepmind.com/blog/wavenet-generative-model-raw-audio/}.
+		Accessed 29 Nov. 2016.
+
 	\bibitem{syntaxnet}
 		Petrov, Slav. ``Announcing SyntaxNet: The World's Most Accurate Parser
-		Goes Open Source.'' \textit{Google Research Blob}, 12 May 2016. Web. 20
-		Aug. 2016.
+		Goes Open Source.'' \textit{Google Research Blob}, 12 May 2016.
+		\url{https://research.googleblog.com/2016/05/announcing-syntaxnet-worlds-most.html}.
+		Accessed 20 Aug. 2016.
 
 	\bibitem{graddescent}
 		Ruder, Sebestian. ``An Overview of Gradient Descent Algorithms.''
 		\textit{Sebestian Ruder}, 19 Jan. 2016,
 		\url{sebastianruder.com/optimizing-gradient-descent/index.html#gradientdescentvariants
-		}. Web. 10 Sept. 2016
+		}. Accessed 10 Sept. 2016
 
 	\bibitem{bptt}
 		Werbos, Paul J. ``Backpropagation Through Time: What It Does and How to
 		Do It.'' \textit{Proceedings of the IEEE}, vol. 78, no. 10, 1990,
-		\url{deeplearning.cs.cmu.edu/pdfs/Werbos.backprop.pdf}. Web. 11 Oct.
+		\url{deeplearning.cs.cmu.edu/pdfs/Werbos.backprop.pdf}. Accessed 11 Oct.
 		2016.
 
 \end{thebibliography}
