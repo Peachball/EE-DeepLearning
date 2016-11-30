@@ -413,8 +413,6 @@ def keras_control_test():
     model = Sequential()
     model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same',
         input_shape=(3, 32, 32)))
-    model.add(MaxPooling2D((2, 2), border_mode='same'))
-
     model.add(BatchNormalization(axis=1))
     model.add(Dropout(0.5))
     model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
@@ -423,6 +421,20 @@ def keras_control_test():
     model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
     model.add(MaxPooling2D((2, 2), border_mode='same'))
 
+    model.add(BatchNormalization(axis=1))
+    model.add(Dropout(0.5))
+    model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
+    model.add(BatchNormalization(axis=1))
+    model.add(Dropout(0.5))
+    model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
+    model.add(BatchNormalization(axis=1))
+    model.add(Dropout(0.5))
+    model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
+    model.add(MaxPooling2D((2, 2), border_mode='same'))
+
+    model.add(BatchNormalization(axis=1))
+    model.add(Dropout(0.5))
+    model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
     model.add(BatchNormalization(axis=1))
     model.add(Dropout(0.5))
     model.add(Convolution2D(128, 3, 3, activation=act, border_mode='same'))
@@ -445,7 +457,8 @@ def keras_control_test():
                 metrics=['accuracy'])
 
     (X_dat, Y_dat), (X_val, Y_val) = get_data()
-    print(X_dat.shape)
+    # X_dat = X_dat.transpose(0, 3, 1, 2)
+    # print(X_dat.shape)
 
     try:
         model.load_weights('6layertest.h5')
@@ -461,7 +474,8 @@ def keras_control_test():
 
     while True:
         model.save_weights('6layertest.h5', overwrite=True)
-        model.fit(X_dat, Y_dat, nb_epoch=1, validation_split=0.2)
+        model.fit(X_dat, Y_dat, nb_epoch=1, validation_split=0.2,
+                batch_size=32)
 
 def control_test():
     """
