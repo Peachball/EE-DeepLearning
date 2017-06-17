@@ -12,6 +12,9 @@ def view_error(f):
     f.close()
     return err
 
+def view_lstm_stats(data_dir='rundata'):
+    from os.path import join
+
 def view_EEData(dirname='EEimages/EE data'):
     from os import listdir
     from os.path import join, isfile, splitext, basename
@@ -24,7 +27,7 @@ def view_EEData(dirname='EEimages/EE data'):
     legend = []
     files = [join(dirname, f) for f in listdir(dirname) if isfile(join(dirname, f))]
     files.sort()
-    for f in files[4::4]:
+    for f in files[:]:
         _, ext = splitext(f)
         if ext == '.txt':
             continue
